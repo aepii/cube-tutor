@@ -26,5 +26,5 @@ export const FACE_COLOR_MAP: Record<FaceIndex, string> = {
   3: "#ffff00", // yellow
   4: "#00ff00", // green
   5: "#0000ff", // blue
-  6: "#000000", // black
+  6: "#666666", // gray
 };
