@@ -9,6 +9,6 @@ export type FaceString =
   | "back"
   | "default";
 
-export type CubeData = number[][][];
+export type CubeData = FaceIndex[][][];
 
 export type Coordinates = { x: number; y: number; z: number };

@@ -3,26 +3,29 @@ import type { Coordinates, FaceIndex } from "@/cube/types";
 import { useMemo } from "react";
 import { faceIndexToFaceColor } from "@/cube/mapping";
 
+// Creates a Cubie component that represents a single cubie of a cube
 export default function Cubie({
   pos,
   faceColors,
 }: {
   pos: Coordinates;
-  faceColors: Record<FaceIndex, number>;
+  faceColors: Map<FaceIndex, FaceIndex>;
 }) {
+  // Creates a geometry for the cubie with colors based on the face indices
   const meshGeometry = useMemo(() => {
+    // Use non-indexed geometry to allow per-face coloring
     const boxGeometry = new THREE.BoxGeometry(0.95, 0.95, 0.95).toNonIndexed();
+    // Array to hold colors for each vertex
     const geometryColors = [];
 
+    // Initializes default color for all vertices
     const { r: dr, g: dg, b: db } = new THREE.Color(faceIndexToFaceColor(6));
-
     for (let i = 0; i < 36; i++) {
       geometryColors.push(dr, dg, db);
     }
 
-    for (const faceIndex in faceColors) {
-      const colorIndex = faceColors[faceIndex];
-
+    // Assigns colors to vertices based on the face colors
+    for (const [faceIndex, colorIndex] of faceColors) {
       const { r, g, b } = new THREE.Color(faceIndexToFaceColor(colorIndex));
 
       const vertexStart = faceIndex * 6;
