@@ -6,10 +6,14 @@ import { GESTURE_CONSTANTS } from "@/constants";
 
 export function useCubeGestures() {
   const [orbitalControlsEnabled, setOrbitalControlsEnabled] = useState(true);
+
   const xRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
   const yRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
   const prevXRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.x);
   const prevYRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.y);
+
+  const scale = useSharedValue(GESTURE_CONSTANTS.INITIAL_ZOOM_SCALE);
+  const prevScale = useSharedValue(GESTURE_CONSTANTS.INITIAL_ZOOM_SCALE);
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
@@ -34,10 +38,22 @@ export function useCubeGestures() {
       prevYRotation.value = translationY;
     });
 
+  const zoomGesture = Gesture.Pinch()
+    .runOnJS(true)
+    .onBegin(() => {
+      prevScale.value = scale.value;
+    })
+    .onUpdate((e) => {
+      scale.value = prevScale.value * e.scale;
+    });
+
+  const composedGestures = Gesture.Race(panGesture, zoomGesture);
+
   return {
     orbitalControlsEnabled,
     setOrbitalControlsEnabled,
     rotationState: { xRotation, yRotation },
-    panGesture,
+    scale,
+    composedGestures,
   };
 }

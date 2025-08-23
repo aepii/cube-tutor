@@ -1,14 +1,15 @@
-import { useThree } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useThree, useFrame } from "@react-three/fiber";
 import { CAMERA_CONSTANTS } from "@/constants";
+import { ZoomScale } from "@/types";
 
-export default function CubeCamera() {
+export default function CubeCamera({ scale }: { scale: ZoomScale }) {
   const { camera } = useThree();
 
-  useMemo(() => {
-    camera.position.set(...CAMERA_CONSTANTS.DEFAULT_POSITION);
+  useFrame(() => {
+    const [x, y, z] = CAMERA_CONSTANTS.DEFAULT_POSITION;
+    camera.position.set(x * scale.value, y * scale.value, z * scale.value);
     camera.updateProjectionMatrix();
-  }, [camera]);
+  });
 
   return null;
 }

@@ -1,5 +1,5 @@
 import { Canvas } from "@react-three/fiber";
-import { DEFAULT_CUBE_DATA } from "@/constants/cube.constants";
+import { DEFAULT_CUBE_DATA } from "@/constants";
 import { colors } from "@/theme/colors";
 import {
   GestureDetector,
@@ -15,17 +15,18 @@ export default function CubeViewer() {
     orbitalControlsEnabled,
     setOrbitalControlsEnabled,
     rotationState,
-    panGesture,
+    scale,
+    composedGestures,
   } = useCubeGestures();
 
   return (
     <GestureHandlerRootView>
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={composedGestures}>
         <Canvas
           style={{ backgroundColor: colors.primary }}
           onPointerUp={() => setOrbitalControlsEnabled(true)}
         >
-          <CubeCamera />
+          <CubeCamera scale={scale} />
           <CubeLighting />
           <Cube
             cubeData={DEFAULT_CUBE_DATA}

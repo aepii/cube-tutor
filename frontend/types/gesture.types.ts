@@ -5,6 +5,8 @@ export interface RotationState {
   yRotation: SharedValue<number>;
 }
 
+export type ZoomScale = SharedValue<number>;
+
 export interface GestureConfig {
   enabled: boolean;
   sensitivity?: number;
