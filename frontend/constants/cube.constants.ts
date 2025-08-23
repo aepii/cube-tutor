@@ -1,5 +1,7 @@
 import { CubeData, FaceIndex } from "@/types";
 
+export const CUBE_SIZE = 3;
+
 export const CUBE_CONSTANTS = {
   CUBIE_SIZE: 0.95,
   HOVER_BRIGHTNESS_MULTIPLIER: 1.5,
@@ -13,10 +15,10 @@ export const GEOMETRY_CONSTANTS = {
 } as const;
 
 export const DEFAULT_CUBE_DATA: CubeData = [
-  Array(3).fill(Array(3).fill(0)),
-  Array(3).fill(Array(3).fill(1)),
-  Array(3).fill(Array(3).fill(2)),
-  Array(3).fill(Array(3).fill(3)),
-  Array(3).fill(Array(3).fill(4)),
-  Array(3).fill(Array(3).fill(5)),
+  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(0)), 
+  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(1)), 
+  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(2)), 
+  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(3)), 
+  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(4)), 
+  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(5)),
 ];
