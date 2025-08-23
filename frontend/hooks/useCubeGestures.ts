@@ -8,26 +8,30 @@ export function useCubeGestures() {
   const [orbitalControlsEnabled, setOrbitalControlsEnabled] = useState(true);
   const xRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
   const yRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
-  const prev = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION);
+  const prevXRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.x);
+  const prevYRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.y);
 
   const panGesture = Gesture.Pan()
+    .runOnJS(true)
+
     .onBegin(() => {
-      prev.value = GESTURE_CONSTANTS.INITIAL_POSITION;
+      prevXRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.x;
+      prevYRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.y;
     })
     .onUpdate(({ translationX, translationY }) => {
       if (!orbitalControlsEnabled) return;
-
       const { dx, dy } = calculateRotationDelta(
         translationX,
         translationY,
-        prev.value.x,
-        prev.value.y
+        prevXRotation.value,
+        prevYRotation.value
       );
 
       xRotation.value += dy;
       yRotation.value += dx;
 
-      prev.value = { x: translationX, y: translationY };
+      prevXRotation.value = translationX;
+      prevYRotation.value = translationY;
     });
 
   return {
