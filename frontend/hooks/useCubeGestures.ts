@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Gesture } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
-import { calculateRotationDelta } from "@/utils";
+import { calculateXYRotationDelta, calculateZRotationDelta } from "@/utils";
 import { GESTURE_CONSTANTS } from "@/constants";
 
 export function useCubeGestures() {
@@ -26,13 +26,11 @@ export function useCubeGestures() {
     })
     .onUpdate(({ translationX, translationY }) => {
       if (!orbitalControlsEnabled) return;
-      const { dx, dy } = calculateRotationDelta(
+      const { dx, dy } = calculateXYRotationDelta(
         translationX,
         translationY,
-        GESTURE_CONSTANTS.INITIAL_POSITION.z,
         prevXRotation.value,
-        prevYRotation.value,
-        GESTURE_CONSTANTS.INITIAL_POSITION.z
+        prevYRotation.value
       );
 
       xRotation.value += dy;
@@ -58,14 +56,7 @@ export function useCubeGestures() {
     })
     .onUpdate((e) => {
       if (!orbitalControlsEnabled) return;
-      const { dz } = calculateRotationDelta(
-        GESTURE_CONSTANTS.INITIAL_POSITION.x,
-        GESTURE_CONSTANTS.INITIAL_POSITION.y,
-        e.rotation,
-        GESTURE_CONSTANTS.INITIAL_POSITION.x,
-        GESTURE_CONSTANTS.INITIAL_POSITION.y,
-        prevZRotation.value
-      );
+      const dz = calculateZRotationDelta(e.rotation, prevZRotation.value);
 
       zRotation.value += dz;
 
