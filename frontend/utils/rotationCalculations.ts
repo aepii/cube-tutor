@@ -23,7 +23,7 @@ export function calculateZRotationDelta(
   translationZ: number,
   prevZ: number,
   sensitivity: number = GESTURE_CONSTANTS.DEFAULT_SENSITIVITY
-) {
+): number {
   return (
     (translationZ - prevZ) *
     GESTURE_CONSTANTS.DEFAULT_ROTATION_SPEED *
