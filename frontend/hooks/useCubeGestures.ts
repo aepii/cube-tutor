@@ -20,12 +20,9 @@ export function useCubeGestures() {
   const panGesture = Gesture.Pan()
     .runOnJS(true)
     .maxPointers(1)
-    .onBegin(() => {
-      prevXRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.x;
-      prevYRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.y;
-    })
     .onUpdate(({ translationX, translationY }) => {
       if (!orbitalControlsEnabled) return;
+      console.log("PAN");
       const { dx, dy } = calculateXYRotationDelta(
         translationX,
         translationY,
@@ -38,34 +35,40 @@ export function useCubeGestures() {
 
       prevXRotation.value = translationX;
       prevYRotation.value = translationY;
+    })
+    .onEnd(() => {
+      prevXRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.x;
+      prevYRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.y;
     });
 
   const zoomGesture = Gesture.Pinch()
     .runOnJS(true)
-    .onBegin(() => {
-      prevScale.value = scale.value;
-    })
     .onUpdate((e) => {
-      scale.value = prevScale.value * e.scale;
+      scale.value = prevScale.value / e.scale;
+      console.log(scale.value);
+    })
+    .onEnd(() => {
+      prevScale.value = scale.value;
     });
 
   const rotationGesture = Gesture.Rotation()
     .runOnJS(true)
-    .onBegin(() => {
-      prevZRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.z;
-    })
     .onUpdate((e) => {
       if (!orbitalControlsEnabled) return;
-      const dz = calculateZRotationDelta(e.rotation, prevZRotation.value);
+      const dz = calculateZRotationDelta(-e.rotation, prevZRotation.value);
 
       zRotation.value += dz;
 
-      prevZRotation.value = e.rotation;
+      prevZRotation.value = -e.rotation;
+    })
+    .onEnd(() => {
+      prevZRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.z;
     });
 
   const composedGestures = Gesture.Race(
-    Gesture.Simultaneous(panGesture, zoomGesture),
-    rotationGesture
+    panGesture,
+    rotationGesture,
+    zoomGesture
   );
 
   return {
