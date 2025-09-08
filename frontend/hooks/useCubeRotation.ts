@@ -9,9 +9,7 @@ export function useCubeRotation(rotationState: RotationState) {
   useFrame(() => {
     if (!cubeGroupRef.current) return;
 
-    const dx = rotationState.xRotation.value;
-    const dy = rotationState.yRotation.value;
-    const dz = rotationState.zRotation.value;
+    const { x: dx, y: dy, z: dz } = rotationState.value;
 
     if (dx !== 0) {
       const qx = new THREE.Quaternion().setFromAxisAngle(
@@ -19,7 +17,7 @@ export function useCubeRotation(rotationState: RotationState) {
         dx
       );
       cubeGroupRef.current.quaternion.premultiply(qx);
-      rotationState.xRotation.value = 0;
+      rotationState.value = { ...rotationState.value, x: 0 };
     }
 
     if (dy !== 0) {
@@ -28,7 +26,7 @@ export function useCubeRotation(rotationState: RotationState) {
         dy
       );
       cubeGroupRef.current.quaternion.premultiply(qy);
-      rotationState.yRotation.value = 0;
+      rotationState.value = { ...rotationState.value, y: 0 };
     }
 
     if (dz !== 0) {
@@ -37,7 +35,7 @@ export function useCubeRotation(rotationState: RotationState) {
         dz
       );
       cubeGroupRef.current.quaternion.premultiply(qz);
-      rotationState.zRotation.value = 0;
+      rotationState.value = { ...rotationState.value, z: 0 };
     }
   });
 

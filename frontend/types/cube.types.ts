@@ -1,4 +1,4 @@
-import { RotationState } from "./gesture.types";
+import { RotationState, SetOrbitalControlsEnabled, SetTurnInput, TurnInput } from "./gesture.types";
 
 export interface Coordinates {
   x: number;
@@ -17,12 +17,15 @@ export interface CubieData {
 
 export interface CubeProps {
   cubeData: CubeData;
-  setOrbitalControlsEnabled: (enabled: boolean) => void;
+  setOrbitalControlsEnabled: SetOrbitalControlsEnabled;
   rotationState: RotationState;
+  turnInput: TurnInput | null;
+  setTurnInput: SetTurnInput;
 }
 
 export interface CubieProps {
   position: Coordinates;
   faceColors: Map<FaceIndex, FaceIndex>;
-  setOrbitalControlsEnabled: (enabled: boolean) => void;
+  setOrbitalControlsEnabled: SetOrbitalControlsEnabled;
+  setTurnInput: SetTurnInput;
 }

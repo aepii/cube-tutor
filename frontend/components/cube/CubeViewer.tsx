@@ -15,8 +15,10 @@ export default function CubeViewer() {
     orbitalControlsEnabled,
     setOrbitalControlsEnabled,
     rotationState,
-    scale,
+    zoomScale,
     composedGestures,
+    turnInput,
+    setTurnInput,
   } = useCubeGestures();
 
   return (
@@ -26,12 +28,14 @@ export default function CubeViewer() {
           style={{ backgroundColor: colors.primary }}
           onPointerUp={() => setOrbitalControlsEnabled(true)}
         >
-          <CubeCamera scale={scale} />
+          <CubeCamera zoomScale={zoomScale} />
           <CubeLighting />
           <Cube
             cubeData={DEFAULT_CUBE_DATA}
             setOrbitalControlsEnabled={setOrbitalControlsEnabled}
             rotationState={rotationState}
+            turnInput={turnInput}
+            setTurnInput={setTurnInput}
           />
         </Canvas>
       </GestureDetector>

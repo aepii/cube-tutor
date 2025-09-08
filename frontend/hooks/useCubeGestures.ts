@@ -3,66 +3,89 @@ import { Gesture } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
 import { calculateXYRotationDelta, calculateZRotationDelta } from "@/utils";
 import { GESTURE_CONSTANTS } from "@/constants";
+import { TurnInput } from "@/types";
 
 export function useCubeGestures() {
   const [orbitalControlsEnabled, setOrbitalControlsEnabled] = useState(true);
+  const [turnInput, setTurnInput] = useState<TurnInput | null>(null);
 
-  const xRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
-  const yRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
-  const zRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_ROTATION);
-  const prevXRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.x);
-  const prevYRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.y);
-  const prevZRotation = useSharedValue(GESTURE_CONSTANTS.INITIAL_POSITION.z);
+  const rotation = useSharedValue({
+    x: GESTURE_CONSTANTS.INITIAL_ROTATION,
+    y: GESTURE_CONSTANTS.INITIAL_ROTATION,
+    z: GESTURE_CONSTANTS.INITIAL_ROTATION,
+  });
 
-  const scale = useSharedValue(GESTURE_CONSTANTS.INITIAL_ZOOM_SCALE);
-  const prevScale = useSharedValue(GESTURE_CONSTANTS.INITIAL_ZOOM_SCALE);
+  const prevRotation = useSharedValue({
+    x: GESTURE_CONSTANTS.INITIAL_POSITION.x,
+    y: GESTURE_CONSTANTS.INITIAL_POSITION.y,
+    z: GESTURE_CONSTANTS.INITIAL_POSITION.z,
+  });
+
+  const zoomScale = useSharedValue(GESTURE_CONSTANTS.INITIAL_ZOOM_SCALE);
+  const prevZoomScale = useSharedValue(GESTURE_CONSTANTS.INITIAL_ZOOM_SCALE);
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
     .maxPointers(1)
     .onUpdate(({ translationX, translationY }) => {
       if (!orbitalControlsEnabled) return;
-      console.log("PAN");
       const { dx, dy } = calculateXYRotationDelta(
         translationX,
         translationY,
-        prevXRotation.value,
-        prevYRotation.value
+        prevRotation.value.x,
+        prevRotation.value.y
       );
 
-      xRotation.value += dy;
-      yRotation.value += dx;
+      rotation.value = {
+        ...rotation.value,
+        x: rotation.value.x + dy,
+        y: rotation.value.y + dx,
+      };
 
-      prevXRotation.value = translationX;
-      prevYRotation.value = translationY;
+      prevRotation.value = {
+        ...prevRotation.value,
+        x: translationX,
+        y: translationY,
+      };
     })
     .onEnd(() => {
-      prevXRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.x;
-      prevYRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.y;
+      prevRotation.value = {
+        ...prevRotation.value,
+        x: GESTURE_CONSTANTS.INITIAL_POSITION.x,
+        y: GESTURE_CONSTANTS.INITIAL_POSITION.y,
+      };
     });
 
   const zoomGesture = Gesture.Pinch()
     .runOnJS(true)
     .onUpdate((e) => {
-      scale.value = prevScale.value / e.scale;
-      console.log(scale.value);
+      zoomScale.value = prevZoomScale.value / e.scale;
     })
     .onEnd(() => {
-      prevScale.value = scale.value;
+      prevZoomScale.value = zoomScale.value;
     });
 
   const rotationGesture = Gesture.Rotation()
     .runOnJS(true)
     .onUpdate((e) => {
       if (!orbitalControlsEnabled) return;
-      const dz = calculateZRotationDelta(-e.rotation, prevZRotation.value);
+      const dz = calculateZRotationDelta(-e.rotation, prevRotation.value.z);
 
-      zRotation.value += dz;
+      rotation.value = {
+        ...rotation.value,
+        z: rotation.value.z + dz,
+      };
 
-      prevZRotation.value = -e.rotation;
+      prevRotation.value = {
+        ...prevRotation.value,
+        z: -e.rotation,
+      };
     })
     .onEnd(() => {
-      prevZRotation.value = GESTURE_CONSTANTS.INITIAL_POSITION.z;
+      prevRotation.value = {
+        ...prevRotation.value,
+        z: GESTURE_CONSTANTS.INITIAL_POSITION.z,
+      };
     });
 
   const composedGestures = Gesture.Race(
@@ -74,8 +97,10 @@ export function useCubeGestures() {
   return {
     orbitalControlsEnabled,
     setOrbitalControlsEnabled,
-    rotationState: { xRotation, yRotation, zRotation },
-    scale,
+    rotationState: rotation,
+    zoomScale,
     composedGestures,
+    turnInput,
+    setTurnInput,
   };
 }
