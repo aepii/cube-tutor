@@ -13,6 +13,7 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST}
       REDIS_HOST: ${REDIS_HOST}
       DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
     working_dir: /backend
     volumes:
       - ./backend:/backend

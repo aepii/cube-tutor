@@ -1,7 +1,11 @@
+from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+
+if TYPE_CHECKING:
+    from .user_algorithm import UserAlgorithm
 
 
+# Defines the algorithm model for the database layer
 class Algorithm(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
