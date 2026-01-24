@@ -1,0 +1,1316 @@
+{
+  "subset": "OLL",
+  "cases": [
+    {
+      "name": "OLL 1",
+      "subgroup": "Dot Case",
+      "setup": "F R' F' R U2' F R' F' R2' U2' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U2 R2 F R F' U2 R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U' R2 D' r U' r' D R2 U R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "f R U R' U' R f' U' r' U' R U M'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' U' F R' F' R2 U R f' U' f"
+        }
+      ]
+    },
+    {
+      "name": "OLL 2",
+      "subgroup": "Dot Case",
+      "setup": "f U R U' R' f' F U R U' R' F'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y' R U' R2 D' r U r' D R2 U R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' S R U R' U' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' F' f R U R' U' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y r U r' U2 R U2 R' U2 r U' r'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 3",
+      "subgroup": "Dot Case",
+      "setup": "F U R U' R' F' U f U R U' R' f' y",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R' F2 R2 U2 R' F R U2 R2 F2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' f R U R' U' f' U' F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r' R2 U R' U r U2 r' U M'"
+        },
+        {
+          "orientation": "0",
+          "alg": "M R U R' U r U2 r' U M'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 4",
+      "subgroup": "Dot Case",
+      "setup": "F U R U' R' F' U' f U R U' R' f' y",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y' R' F2 R2 U2 R' F' R U2 R2 F2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' f R U R' U' f' U F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' F R F' U' S R' U' R U R S'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F U R U' R' F' U' F R U R' U' F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 5",
+      "subgroup": "Square Shapes",
+      "setup": "r' U' R U' R' U2' r",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r' U2 R U R' U r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l' U2 L U L' U l"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F2 r U r' F R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F2 L F L' F R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 6",
+      "subgroup": "Square Shapes",
+      "setup": "r U R' U R U2' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U2 R' U' R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F U' R2 D R' U' R D' R2 U F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l U2 L' U' L U' l'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' x' D R2 U' R' U R' D' x"
+        }
+      ]
+    },
+    {
+      "name": "OLL 7",
+      "subgroup": "Lightning Shapes",
+      "setup": "r U2' R' U' R U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U R' U R U2 r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "S' R U R' U R U2 R' U S"
+        },
+        {
+          "orientation": "0",
+          "alg": "L' U2 L U2 L F' L' F"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l U L' U L U2 l'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 8",
+      "subgroup": "Lightning Shapes",
+      "setup": "r' U2' R U R' U r y2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y2 r' U' R U' R' U2 r"
+        },
+        {
+          "orientation": "0",
+          "alg": "l' U' L U' L' U2 l"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U2 R' U2 R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' F' r U' r' F2 R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 9",
+      "subgroup": "Fish Shapes",
+      "setup": "F U R U' R2' F' R U R U' R' y'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R U R' U' R' F R2 U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U2 R' U' S' R U' R' S"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F' U' F r U' r' U r U r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' L' U' L U' L F' L' F L' U2 L"
+        }
+      ]
+    },
+    {
+      "name": "OLL 10",
+      "subgroup": "Fish Shapes",
+      "setup": "R U2' R' F R' F' R U' R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U R' F R F' R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F U F' R' F R U' R' F' R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y M' R' U2 R U R' U R U M"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L' U' L U L F' L2 U' L U F"
+        }
+      ]
+    },
+    {
+      "name": "OLL 11",
+      "subgroup": "Lightning Shapes",
+      "setup": "M U' R U2' R' U' R U' R2' r",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r' R2 U R' U R U2 R' U M'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 r U R' U R' F R F' R U2 r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "S R U R' U R U2 R' U2 S'"
+        },
+        {
+          "orientation": "0",
+          "alg": "M R U R' U R U2 R' U M'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 12",
+      "subgroup": "Lightning Shapes",
+      "setup": "F U R U' R' F' U' F U R U' R' F'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y' M' R' U' R U' R' U2 R U' M"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' F' U F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' S R' U' R U' R' U2 R U2 S'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y l L2 U' L U' L' U2 L U' M'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 13",
+      "subgroup": "Knight Move Shapes",
+      "setup": "F' U' F r U' r' U r U r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "F U R U2 R' U' R U R' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F U R U' R2 F' R U R U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U' r' U' r U r' F' U F"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U' r' U' r U r' y L' U L"
+        }
+      ]
+    },
+    {
+      "name": "OLL 14",
+      "subgroup": "Knight Move Shapes",
+      "setup": "F U F' R' F R U' R' F' R",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R' F R U R' F' R F U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U R' U' r' F R2 U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F' U' L' U L2 F L' U' L' U L"
+        },
+        {
+          "orientation": "0",
+          "alg": "l' U l U l' U' l F U' F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 15",
+      "subgroup": "Knight Move Shapes",
+      "setup": "r' U' r U' R' U R r' U r",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r' U' r R' U' R U r' U r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l' U' l L' U' L U l' U l"
+        },
+        {
+          "orientation": "0",
+          "alg": "r' U' M' U' R U r' U r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F' R L' U' L U R' F R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 16",
+      "subgroup": "Knight Move Shapes",
+      "setup": "r U r' U R U' R' r U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U r' R U R' U' r U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U M U R' U' r U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F R U R' U' F' R U' R' U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l U l' L U L' U' l U' l'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 17",
+      "subgroup": "Dot Case",
+      "setup": "F R' F' R U2' F R' F' R U' R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U R' F R F' U2 R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F R' F' R U S' R U' R' S"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F R' F' R2 r' U R U' R' U' M'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' F' r U r' U' S r' F r S'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 18",
+      "subgroup": "Dot Case",
+      "setup": "r' U2' R U R' U r2' U2' R' U' R U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R U2 R2 F R F' U2 M' U R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F S' R U' R' S R U2 R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U R' U R U2 r2 U' R U' R' U2 r"
+        },
+        {
+          "orientation": "0",
+          "alg": "R D r' U' r D' R' U' R2 F R F' R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 19",
+      "subgroup": "Dot Case",
+      "setup": "F R' F' R M U R U' R' U' M'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y S' R U R' S U' R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "M U R U R' U' M' R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' U2 F R U R' U' F2 U2 F R"
+        },
+        {
+          "orientation": "0",
+          "alg": "r' R U R U R' U' r R2 F R F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 20",
+      "subgroup": "Dot Case",
+      "setup": "r U R' U' M2' U R U' R' U' M'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U R' U' M2 U R U' R' U' M'"
+        },
+        {
+          "orientation": "0",
+          "alg": "M' U2 M U2 M' U M U2 M' U2 M"
+        },
+        {
+          "orientation": "0",
+          "alg": "S' R U R' S U' M' U R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "S R' U' R U R U R U' R' S'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 21",
+      "subgroup": "OCLL",
+      "setup": "R U R' U R U' R' U R U2' R' y'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U R U' R' U R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U2 R' U' R U R' U' R U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F R U R' U' R U R' U' R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' U' R U' R' U R U' R' U2 R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 22",
+      "subgroup": "OCLL",
+      "setup": "R' U2' R2' U R2' U R2' U2' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U2 R2 U' R2 U' R2 U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' U2 R2 U R2 U R2 U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "f R U R' U' S' R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "f R U R' U' f' F R U R' U' F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 23",
+      "subgroup": "OCLL",
+      "setup": "R U2' R D R' U2' R D' R2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R2 D R' U2 R D' R' U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R2 D' R U2 R' D R U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U R' U R U2 R2 U' R U' R' U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' R U2 R' U' R U' R' L' U2 L U L' U L"
+        }
+      ]
+    },
+    {
+      "name": "OLL 24",
+      "subgroup": "OCLL",
+      "setup": "F R' F' r U R U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U R' U' r' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' x' R U R' D R U' R' D' x"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F' r U R U' r' F"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U R D R' U' R D' R2"
+        }
+      ]
+    },
+    {
+      "name": "OLL 25",
+      "subgroup": "OCLL",
+      "setup": "R' F' r U R U' r' F y'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U2 R D R' U2 R D' R2"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F' r U R' U' r' F R"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R' F' r U R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "x R' U R D' R' U' R D x'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 26",
+      "subgroup": "OCLL",
+      "setup": "R U R' U R U2' R' y'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R U2 R' U' R U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' U' R U' R' U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L' U' L U' L' U2 L"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L' U R U' L U R'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 27",
+      "subgroup": "OCLL",
+      "setup": "R U2' R' U' R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' R' U2 R U R' U R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y L' U2 L U L' U L"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L U L' U L U2 L'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 28",
+      "subgroup": "All Corners Oriented",
+      "setup": "R U R' U' M' U R U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U R' U' M U R U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U R' U' r' R U R U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' F R S R' F' R S'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 M' U M U2 M' U M"
+        }
+      ]
+    },
+    {
+      "name": "OLL 29",
+      "subgroup": "Awkward Shapes",
+      "setup": "M F R' F' R U R U' R' U' M'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r2 D' r U r' D r2 U' r' U' r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U R' U' R U' R' F' U' F R U R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y S' R U R' U' R' F R F' U S"
+        },
+        {
+          "orientation": "0",
+          "alg": "M U R U R' U' R' F R F' M'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 30",
+      "subgroup": "Awkward Shapes",
+      "setup": "F U R U2' R' U R U2' R' U' F' y2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y' r' D' r U' r' D r2 U' r' U r U r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F U R U2 R' U' R U2 R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F R' F R2 U' R' U' R U R' F2"
+        },
+        {
+          "orientation": "0",
+          "alg": "y S' R' U' R f R' U R U' F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 31",
+      "subgroup": "P Shapes",
+      "setup": "R' F R U R' U' F' U R",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R' U' F U R U' R' F' R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 S' L' U' L U L F' L' f"
+        },
+        {
+          "orientation": "0",
+          "alg": "y S R U R' U' f' U' F"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' F R' F' R U R U R' U' R U' R'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 32",
+      "subgroup": "P Shapes",
+      "setup": "f R' F' R U R U' R' S'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "S R U R' U' R' F R f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L U F' U' L' U L F L'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U B' U' R' U R B R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' R' F R F' U' r U' r' U r U r'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 33",
+      "subgroup": "T Shapes",
+      "setup": "F R' F' R U R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U' R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L' U' L U L F' L' F"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 r' F' r U r U' r' F"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U R' F' U' F R U' R'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 34",
+      "subgroup": "C Shapes",
+      "setup": "F U R' U' R' F' R U R2' U' R' y2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y f R f' U' r' U' R U M'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R U R2 U' R' F R U R U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' R' F' r U R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R U R' U' B' R' F R F' B"
+        }
+      ]
+    },
+    {
+      "name": "OLL 35",
+      "subgroup": "Fish Shapes",
+      "setup": "R U2' R' F R' F' R2' U2' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U2 R2 F R F' R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "f R U R' U' f' R U R' U R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y L' U2 L2 F' L' F L' U2 L"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U2 R' d' R' F R U' R' F' R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 36",
+      "subgroup": "W Shapes",
+      "setup": "F' L F L' U' L' U' L U L' U L y2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R U R2 F' U' F U R2 U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L' U' L U' L' U L U L F' L' F"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R U R' F' R U R' U' R' F R U' R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F' U' F2 U R U' R' F' R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 37",
+      "subgroup": "Fish Shapes",
+      "setup": "F R U' R' U R U R' F'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "F R' F' R U R U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R U' R' U' R U R' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F' r U r' U' r' F r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 r2 D' r U' r' D r U r"
+        }
+      ]
+    },
+    {
+      "name": "OLL 38",
+      "subgroup": "W Shapes",
+      "setup": "F R' F' R U R U R' U' R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U R U' R' U' R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F R U' R' S U' R U R' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U R' U' r' F R U R U' R' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 L U L' U L U' L' U' L' B L B'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 39",
+      "subgroup": "Lightning Shapes",
+      "setup": "L U F' U' L' U L F L' y'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y' R U R' F' U' F U R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' f' r U r' U' r' F r S"
+        },
+        {
+          "orientation": "0",
+          "alg": "y L F' L' U' L U F U' L'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' f' L F L' U' L' U L S"
+        }
+      ]
+    },
+    {
+      "name": "OLL 40",
+      "subgroup": "Lightning Shapes",
+      "setup": "R' U' F U R U' R' F' R y'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R' F R U R' U' F' U R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' f R' F' R U R U' R' S'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R r D r' U r D' r' U' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' L' U' L F U F' U' L' U2 L"
+        }
+      ]
+    },
+    {
+      "name": "OLL 41",
+      "subgroup": "Awkward Shapes",
+      "setup": "F U R U' R' F' R U2' R' U' R U' R' y2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y2 R U R' U R U2 R' F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F U R2 D R' U' R D' R2 F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' S U' R' F' U' F U R S'"
+        },
+        {
+          "orientation": "0",
+          "alg": "M U' F' L' U' L U F M'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 42",
+      "subgroup": "Awkward Shapes",
+      "setup": "F U R U' R' F' R' U2' R U R' U R",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R' U' R U' R' U2 R F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F S' R U R' U' F' U S"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R' F R F' R' F R F' R U R' U' R U R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R' U' F2 u' R U R' D R2 B"
+        }
+      ]
+    },
+    {
+      "name": "OLL 43",
+      "subgroup": "P Shapes",
+      "setup": "f' U' L' U L f",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R' U' F' U F R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F' U' L' U L F"
+        },
+        {
+          "orientation": "0",
+          "alg": "f' L' U' L U f"
+        },
+        {
+          "orientation": "0",
+          "alg": "B' U' R' U R B"
+        }
+      ]
+    },
+    {
+      "name": "OLL 44",
+      "subgroup": "P Shapes",
+      "setup": "f U R U' R' f'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "f R U R' U' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F U R U' R' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U B U' B' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' L U F U' F' L'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 45",
+      "subgroup": "T Shapes",
+      "setup": "F U R U' R' F'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R' F' U' F U R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 f U R U' R' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 F' L' U' L U F"
+        }
+      ]
+    },
+    {
+      "name": "OLL 46",
+      "subgroup": "C Shapes",
+      "setup": "R' U' F R' F' R U R",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R' U' R' F R F' U R"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' F' U' F R U' R' U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y F R U R' U' F' U' R U R' U R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "l' U2 L2 F' L' F U L' U l"
+        }
+      ]
+    },
+    {
+      "name": "OLL 47",
+      "subgroup": "L Shapes",
+      "setup": "F' U' L' U L U' L' U L F",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "F' L' U' L U L' U' L U F"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' F R' F' R U2 R U' R' U R U2 R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R' U' R' F R F' R' F R F' U R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' R' F' U' F U F' U' F U R"
+        }
+      ]
+    },
+    {
+      "name": "OLL 48",
+      "subgroup": "L Shapes",
+      "setup": "F U R U' R' U R U' R' F'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 f U R U' R' U R U' R' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U2 R' U' R U R' U2 R' F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R' F' U2 R U R' U R2 U2 R'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 49",
+      "subgroup": "L Shapes",
+      "setup": "r' U r2' U' r2' U' r2' U r' y2'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y2 r U' r2 U r2 U r2 U' r"
+        },
+        {
+          "orientation": "0",
+          "alg": "l U' l2 U l2 U l2 U' l"
+        },
+        {
+          "orientation": "0",
+          "alg": "R B' R2 F R2 B R2 F' R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F R' F' R2 U2 B' R B R'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 50",
+      "subgroup": "L Shapes",
+      "setup": "r U' r2' U r2' U r2' U' r",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r' U r2 U' r2 U' r2 U r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 R' F R2 B' R2 F' R2 B R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' R U2 R' U' R U' R' F R U R' U' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l' U l2 U' l2 U' l2 U l'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 51",
+      "subgroup": "Line Shapes",
+      "setup": "f U R U' R' U R U' R' f'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y2 F U R U' R' U R U' R' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "f R U R' U' R U R' U' f'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' R' U' R' F R F' R U' R' U2 R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y r' F' U' F U F' U' F U r"
+        }
+      ]
+    },
+    {
+      "name": "OLL 52",
+      "subgroup": "Line Shapes",
+      "setup": "F R U R' d R' U' R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y2 R' F' U' F U' R U R' U R"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U R' U R U' B U' B' R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U R' U R d' R U' R' F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U R' U R U' y R U' R' F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 53",
+      "subgroup": "L Shapes",
+      "setup": "r' U2' R U R' U' R U R' U r",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r' U' R U' R' U R U' R' U2 r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y r' U2 R U R' U' R U R' U r"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l' U' L U' L' U L U' L' U2 l"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' l' U2 L U L' U' L U L' U l"
+        }
+      ]
+    },
+    {
+      "name": "OLL 54",
+      "subgroup": "L Shapes",
+      "setup": "r U2' R' U' R U R' U' R U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U R' U R U' R' U R U2 r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' r U2 R' U' R U R' U' R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y' r U r' R U R' U' R U R' U' r U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y2 l U L' U L U' L' U L U2 l'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 55",
+      "subgroup": "Line Shapes",
+      "setup": "F R' F' U2' R U R' U R2' U2' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "y R' F U R U' R2 F' R2 U R' U' R"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R' F R U R U' R2 F' R2 U' R' U R U R'"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U2 R2 U' R U' R' U2 F R F'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U2 R2 F R F' U2 r' F R F'"
+        }
+      ]
+    },
+    {
+      "name": "OLL 56",
+      "subgroup": "Line Shapes",
+      "setup": "r U r' R U R' U' R U R' U' r U' r'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "r U r' U R U' R' U R U' R' r U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r U r' U R U' R' M' U R U2 r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "F R U R' U' R F' r U R' U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "r' U' r U' R' U R U' R' U R r' U r"
+        }
+      ]
+    },
+    {
+      "name": "OLL 57",
+      "subgroup": "All Corners Oriented",
+      "setup": "r U R' U' M U R U' R'",
+      "solutions": [
+        {
+          "orientation": "0",
+          "alg": "R U R' U' M' U R U' r'"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U' R' S' R U R' S"
+        },
+        {
+          "orientation": "0",
+          "alg": "y R U R' S' R U' R' S"
+        },
+        {
+          "orientation": "0",
+          "alg": "R U R' U' R' r U R U' r'"
+        }
+      ]
+    }
+  ]
+}

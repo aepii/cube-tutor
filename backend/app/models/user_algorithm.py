@@ -3,7 +3,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from .user import User
-    from .algorithm import Algorithm
+    from .algorithm_solution import AlgorithmSolution
 
 # Defines the user algorithm model for the database layer
 class UserAlgorithm(SQLModel, table=True):
@@ -14,5 +14,5 @@ class UserAlgorithm(SQLModel, table=True):
     is_learned: bool = False
     is_favorited: bool = False
 
-    user: Optional["User"] = Relationship(back_populates="algorithms")
-    algorithm: Optional["Algorithm"] = Relationship(back_populates="users")
+    user: "User" = Relationship(back_populates="algorithms")
+    solution: "AlgorithmSolution" = Relationship(back_populates="users")
