@@ -40,6 +40,7 @@ def scrape_subset(url: str) -> dict:
         data_ori_divs = algorithm.select("div[data-ori]")
 
         key = (alg_name, subgroup)
+        # Add broad case to cases
         if key not in cases:
             cases[key] = {
                 "name": alg_name,
@@ -48,6 +49,7 @@ def scrape_subset(url: str) -> dict:
                 "solutions": [],
             }
 
+        # Add specific solutions to broad case
         for orientation in data_ori_divs:
             ori_value = orientation.get("data-ori")
             formatted_algs = orientation.select(".formatted-alg")

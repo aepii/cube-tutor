@@ -1,7 +1,8 @@
 from sqlmodel import SQLModel, create_engine, Session
 from dotenv import load_dotenv
-from app import models
+from contextlib import contextmanager
 from app.core.settings import settings
+from app import models
 
 load_dotenv()
 
@@ -21,3 +22,7 @@ def get_session():
         yield session
     finally:
         session.close()
+
+
+# Session for use outside of FastAPI
+db_context = contextmanager(get_session)

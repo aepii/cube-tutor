@@ -17,6 +17,7 @@ services:
     working_dir: /backend
     volumes:
       - ./backend:/backend
+      - ./scraper/data/raw:/app/data/raw
     command: uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --reload
     depends_on:
       postgres:
