@@ -1,6 +1,6 @@
 from datetime import datetime, UTC, timedelta
 from typing import Optional
-from jose import jwt
+import jwt
 from passlib.context import CryptContext
 from app.core.settings import settings
 from pydantic import SecretStr
@@ -41,3 +41,15 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
     return encoded_jwt
+
+
+# Decodes a JWT access token
+def decode_access_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        print("Token has expired")
+    except jwt.InvalidTokenError as e:
+        print(f"Invalid token: {e}")
+    return None
