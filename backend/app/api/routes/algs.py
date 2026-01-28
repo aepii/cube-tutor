@@ -2,18 +2,22 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from app.core.db import get_session
 from app.models import AlgorithmSolution, AlgorithmCase, User, UserAlgorithm
-from app.api.schemas.algorithm import AlgorithmRead
+from app.api.schemas.algorithm import (
+    AlgorithmResponse,
+    AlgorithmFavoriteResponse,
+    AlgorithmLearnResponse,
+)
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/v1/algs", tags=["algs"])
 
 
 # Endpoint for algorithm retrieval
-@router.get("/", response_model=list[AlgorithmRead])
+@router.get("/", response_model=list[AlgorithmResponse])
 def read_algorithms(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-) -> list[AlgorithmRead]:
+) -> list[AlgorithmResponse]:
     # Join algorithm solutions and algorithm cases on case id
     statement = select(AlgorithmSolution, AlgorithmCase).join(
         AlgorithmCase, AlgorithmSolution.case_id == AlgorithmCase.id
@@ -38,12 +42,12 @@ def read_algorithms(
 
 
 # Endpoint for favoriting an algorithm
-@router.post("/{alg_id}/favorite")
+@router.post("/{alg_id}/favorite", response_model=AlgorithmFavoriteResponse)
 def favorite_algorithm(
     alg_id: int,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> AlgorithmFavoriteResponse:
     # Ensure algorithm exists
     alg = session.get(AlgorithmSolution, alg_id)
     if not alg:
@@ -72,16 +76,19 @@ def favorite_algorithm(
     session.commit()
     session.refresh(link)
 
-    return {"algorithm_id": alg_id, "is_favorited": link.is_favorited}
+    return AlgorithmFavoriteResponse(
+        algorithm_id=alg_id,
+        is_favorited=link.is_favorited,
+    )
 
 
 # Endpoint for learning an algorithm
-@router.post("/{alg_id}/learn")
+@router.post("/{alg_id}/learn", response_model=AlgorithmLearnResponse)
 def learn_algorithm(
     alg_id: int,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> AlgorithmLearnResponse:
     # Ensure algorithm exists
     alg = session.get(AlgorithmSolution, alg_id)
     if not alg:
@@ -110,4 +117,7 @@ def learn_algorithm(
     session.commit()
     session.refresh(link)
 
-    return {"algorithm_id": alg_id, "is_learned": link.is_learned}
+    return AlgorithmLearnResponse(
+        algorithm_id=alg_id,
+        is_learned=link.is_learned,
+    )

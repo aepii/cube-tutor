@@ -5,6 +5,7 @@ from pydantic import EmailStr
 
 if TYPE_CHECKING:
     from .user_algorithm import UserAlgorithm
+    from .refresh_token import RefreshToken
 
 
 # Defines the user model for the database layer
@@ -16,3 +17,4 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     algorithms: List["UserAlgorithm"] = Relationship(back_populates="user")
+    refresh_tokens: List["RefreshToken"] = Relationship(back_populates="user")

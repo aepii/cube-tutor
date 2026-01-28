@@ -28,7 +28,18 @@ class LoginRequest(BaseModel):
         return v
 
 
+# Defines the schema for a logout request
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
+# Defines the schema for a refresh request
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 # Defines the schema for a token response
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
