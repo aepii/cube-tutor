@@ -2066,15 +2066,15 @@
         },
         {
           "orientation": "3",
-          "alg": "f R' f' U R' U R"
-        },
-        {
-          "orientation": "3",
           "alg": "R' U R f R2 f'"
         },
         {
           "orientation": "3",
           "alg": "R' U R y R U2 R'"
+        },
+        {
+          "orientation": "3",
+          "alg": "f R' f' U R' U R"
         }
       ]
     },

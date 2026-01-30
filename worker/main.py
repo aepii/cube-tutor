@@ -1,0 +1,1 @@
+from shared.celery_app import celery_app

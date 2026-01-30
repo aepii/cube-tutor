@@ -7,7 +7,7 @@ def run():
     url = "https://speedcubedb.com/a/3x3/F2L"
     cases = scrape_subset(url)
 
-    with open("data/raw/f2l.json", "w", encoding="utf-8") as f:
+    with open("../shared/data/raw/f2l.json", "w", encoding="utf-8") as f:
         json.dump(
             {"subset": "F2L", "cases": list(cases.values())},
             f,

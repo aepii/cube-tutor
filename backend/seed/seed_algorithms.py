@@ -5,7 +5,7 @@ from app.core.db import db_context
 from app.models.algorithm_solution import AlgorithmSolution
 from app.models.algorithm_case import AlgorithmCase
 
-DATA_DIR = Path("/app/data/raw")
+DATA_DIR = Path("shared/data/raw")
 
 # Read raw data
 with open(DATA_DIR / "f2l.json", encoding="utf-8") as f:
