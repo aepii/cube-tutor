@@ -11,11 +11,12 @@ const MainLayout = () => {
   // Handle authentication routing
   useEffect(() => {
     if (isLoading) return;
-
+    
+    // Check if in auth screens
     const inAuthGroup = segments[0] === "(auth)";
 
     if (!token && !inAuthGroup) {
-      // If not loggined and not in auth screens, go to login
+      // If not logged in and not in auth screens, go to login
       router.replace("/(auth)/login");
     } else if (token && inAuthGroup) {
       // If logged in and trying to access auth screens, go to tabs
