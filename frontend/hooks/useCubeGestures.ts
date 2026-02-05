@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Gesture } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
-import { calculateXYRotationDelta, calculateZRotationDelta } from "@/utils";
+import { calculateXYRotationDelta, calculateZRotationDelta } from "@/domain/cube";
 import { GESTURE_CONSTANTS } from "@/constants";
 import { TurnInput } from "@/types";
 

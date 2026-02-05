@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { CubieProps } from "@/types/cube.types";
-import { createCubieGeometry } from "@/utils";
+import { createCubieGeometry } from "@/domain/cube";
 
 export default function Cubie({
   position,
