@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
+import { jwtDecode } from "jwt-decode";
 import { saveToken, getToken, removeToken } from "@/utils/storage";
 
 interface AuthContextType {
@@ -10,6 +11,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
+interface DecodedJWT {
+  sub: string;
+  exp: number;
+  type: "access" | "refresh";
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,7 +26,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const loadToken = async () => {
       const storedToken = await getToken("access_token");
       if (storedToken) {
-        setToken(storedToken);
+        try {
+          const decoded: DecodedJWT = jwtDecode(storedToken);
+          const currentTime = Date.now() / 1000;
+          if (currentTime > decoded.exp) {
+            console.warn("Token expired");
+            await removeToken("access_token");
+            setToken(null);
+          }
+          setToken(storedToken);
+        } catch (e) {
+          console.error("Invalid token format", e);
+          await removeToken("access_token");
+          setToken(null);
+        }
       }
       setIsLoading(false);
     };
