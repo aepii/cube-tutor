@@ -3,7 +3,8 @@ from sqlmodel import Session, select
 from app.core.db import get_session
 from app.models import AlgorithmSolution, AlgorithmCase, User, UserAlgorithm
 from app.api.schemas.algorithm import (
-    AlgorithmResponse,
+    SolutionDetail,
+    CaseGroup,
     AlgorithmFavoriteResponse,
     AlgorithmLearnResponse,
 )
@@ -13,32 +14,48 @@ router = APIRouter(prefix="/v1/algs", tags=["algs"])
 
 
 # Endpoint for algorithm retrieval
-@router.get("/", response_model=list[AlgorithmResponse])
+@router.get("/", response_model=list[CaseGroup])
 def read_algorithms(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-) -> list[AlgorithmResponse]:
-    # Join algorithm solutions and algorithm cases on case id
-    statement = select(AlgorithmSolution, AlgorithmCase).join(
-        AlgorithmCase, AlgorithmSolution.case_id == AlgorithmCase.id
+) -> list[CaseGroup]:
+    # Join AlgorithmCase and optionally attach the current user's AlgorithmSolution data
+    statement = (
+        select(AlgorithmSolution, AlgorithmCase, UserAlgorithm)
+        .join(AlgorithmCase, AlgorithmSolution.case_id == AlgorithmCase.id)
+        .outerjoin(
+            UserAlgorithm,
+            (UserAlgorithm.algorithm_id == AlgorithmSolution.id)
+            & (UserAlgorithm.user_id == current_user.id),
+        )
     )
 
     rows = session.exec(statement).all()
 
-    # Flatten results
-    results = []
-    for solution, case in rows:
-        results.append(
-            {
-                "solution_id": solution.id,
-                "case_id": case.id,
-                "case_name": case.name,
-                "subset": case.subset,
-                "notation": solution.solution,
-                "orientation": solution.orientation,
-            }
+    grouped_cases = {}
+
+    for solution, case, user_algo in rows:
+        solution_detail = SolutionDetail(
+            solution_id=solution.id,
+            notation=solution.solution,
+            orientation=solution.orientation,
+            is_favorited=user_algo.is_favorited if user_algo else False,
+            is_learned=user_algo.is_learned if user_algo else False,
         )
-    return results
+
+        if case.id not in grouped_cases:
+            grouped_cases[case.id] = CaseGroup(
+                case_id=case.id,
+                case_name=case.name,
+                subset=case.subset,
+                subgroup=case.subgroup,
+                setup=case.setup,
+                solutions=[],
+            )
+
+        grouped_cases[case.id].solutions.append(solution_detail)
+
+    return list(grouped_cases.values())
 
 
 # Endpoint for favoriting an algorithm
