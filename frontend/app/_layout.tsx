@@ -11,7 +11,7 @@ const MainLayout = () => {
   // Handle authentication routing
   useEffect(() => {
     if (isLoading) return;
-    
+
     // Check if in auth screens
     const inAuthGroup = segments[0] === "(auth)";
 
