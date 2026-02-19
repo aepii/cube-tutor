@@ -1,5 +1,5 @@
 import { CubeViewer } from "@/components";
 
-export default function Playground() {
+export default function PlaygroundScreen() {
   return <CubeViewer />;
 }

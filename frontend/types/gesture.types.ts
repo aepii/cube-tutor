@@ -1,5 +1,4 @@
 import { SharedValue } from "react-native-reanimated";
-import { Mesh } from "three";
 
 export type RotationState = SharedValue<{
   x: number;
