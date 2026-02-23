@@ -23,11 +23,11 @@ class CaseGroup(BaseModel):
 
 # Defines the schema for a AlgorithmFavoriteResponse
 class AlgorithmFavoriteResponse(BaseModel):
-    algorithm_id: str
+    algorithm_id: int
     is_favorited: bool
 
 
 # Defines the schema for a AlgorithmLearnResponse
 class AlgorithmLearnResponse(BaseModel):
-    algorithm_id: str
+    algorithm_id: int
     is_learned: bool

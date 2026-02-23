@@ -9,7 +9,6 @@ import {
 import { AlgorithmCase } from "@/types";
 import { globalStyles as styles } from "@/styles/globalStyles";
 import SolutionDetail from "./SolutionDetail";
-import { AiOutlineStar, AiFillStar } from "react-icons/ai";
 import { colors } from "@/theme/colors";
 
 function orientationToString(orientation: number): string {
@@ -53,7 +52,7 @@ export default function CaseGroup({ item }: { item: AlgorithmCase }) {
 
       <FlatList
         data={displayedSolutions}
-        renderItem={({ item }) => <SolutionDetail item={item} />}
+        renderItem={({ item }) => <SolutionDetail key={item.solution_id} item={item} />}
       ></FlatList>
     </View>
   );
