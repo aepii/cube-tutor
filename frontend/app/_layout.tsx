@@ -1,12 +1,17 @@
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
-import { AuthProvider, useAuth } from "@/features/auth/providers/AuthProvider";
+import { useAuthStore } from "@/features/auth/store/useAuthStore";
 import { View, ActivityIndicator } from "react-native";
 
-const MainLayout = () => {
-  const { token, isLoading } = useAuth();
+export default function RootLayout() {
+  const { token, isLoading, checkToken } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
+
+  // Run token check
+  useEffect(() => {
+    checkToken();
+  }, []);
 
   // Handle authentication routing
   useEffect(() => {
@@ -24,21 +29,14 @@ const MainLayout = () => {
     }
   }, [token, isLoading, segments]);
 
-  if (isLoading) {
-    return (
-      <View>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  return <Slot />;
-};
-
-export default function RootLayout() {
   return (
-    <AuthProvider>
-      <MainLayout />
-    </AuthProvider>
+    <>
+      <Slot />
+      {isLoading && (
+        <View>
+          <ActivityIndicator />
+        </View>
+      )}
+    </>
   );
 }

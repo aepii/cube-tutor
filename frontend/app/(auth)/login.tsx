@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View, TextInput, Button, Text } from "react-native";
 import { useRouter, Link } from "expo-router";
-import { useAuth } from "@/features/auth/providers/AuthProvider";
+import { useAuthStore } from "@/features/auth/store/useAuthStore";
 import { loginUser } from "@/features/auth/services/auth.service";
 import { globalStyles as styles } from "@/shared/styles/globalStyles";
 
@@ -11,7 +11,7 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { signIn } = useAuth();
+  const { signIn } = useAuthStore();
   const router = useRouter();
 
   const handleLogin = async () => {

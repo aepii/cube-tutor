@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/features/auth/providers/AuthProvider";
+import { useAuthStore } from "@/features/auth/store/useAuthStore";
 import { getAlgorithms } from "@/features/learn/services/alg.service";
 import { View, FlatList, Text, TouchableOpacity } from "react-native";
 import { globalStyles as styles } from "@/shared/styles/globalStyles";
@@ -10,7 +10,7 @@ export default function AlgorithmScreen() {
   const [algs, setAlgs] = useState<AlgorithmCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const { token } = useAuth();
+  const { token } = useAuthStore();
 
   useEffect(() => {
     const loadAlgorithms = async () => {
