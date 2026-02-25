@@ -1,6 +1,6 @@
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/features/auth/providers/AuthProvider";
 import { View, ActivityIndicator } from "react-native";
 
 const MainLayout = () => {

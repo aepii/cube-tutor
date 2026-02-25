@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { getAlgorithms } from "@/services/alg.service";
+import { useAuth } from "@/features/auth/providers/AuthProvider";
+import { getAlgorithms } from "@/features/learn/services/alg.service";
 import { View, FlatList, Text, TouchableOpacity } from "react-native";
-import { globalStyles as styles } from "@/styles/globalStyles";
-import { AlgorithmCase, AlgorithmSolution } from "@/types";
-import CaseGroup from "@/components/learn/CaseGroup";
+import { globalStyles as styles } from "@/shared/styles/globalStyles";
+import { AlgorithmCase } from "@/features/learn/types/algorithm.types";
+import CaseGroup from "@/features/learn/components/CaseGroup";
 
 export default function AlgorithmScreen() {
   const [algs, setAlgs] = useState<AlgorithmCase[]>([]);
