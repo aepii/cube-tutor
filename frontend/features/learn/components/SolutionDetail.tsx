@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { AiOutlineStar, AiFillStar } from "react-icons/ai";
-import { FaGraduationCap } from "react-icons/fa6"
+import { FontAwesome, FontAwesome6 } from "@expo/vector-icons";
 import { AlgorithmSolution } from "@/features/learn/types/algorithm.types";
 import { colors } from "@/shared/theme/colors";
-import { favoriteAlgorithm, learnAlgorithm } from "@/features/learn/services/alg.service";
+import {
+  favoriteAlgorithm,
+  learnAlgorithm,
+} from "@/features/learn/services/alg.service";
 
 export default function SolutionDetail({ item }: { item: AlgorithmSolution }) {
   const [favorite, setFavorite] = useState<boolean>(item.is_favorited);
@@ -36,30 +38,56 @@ export default function SolutionDetail({ item }: { item: AlgorithmSolution }) {
 
   return (
     <View style={localStyles.solutionContainer}>
-      <Text>{item.notation}</Text>
-      <TouchableOpacity onPress={() => toggleLearn()}>
-        {learn ? (
-          <FaGraduationCap style={{ fill: colors.primary }}></FaGraduationCap>
-        ) : (
-          <FaGraduationCap style={{ fill: "gray" }}></FaGraduationCap>
-        )}
-      </TouchableOpacity>
+      <Text style={localStyles.notationText}>{item.notation}</Text>
 
-      <TouchableOpacity onPress={() => toggleFavorite()}>
-        {favorite ? (
-          <AiFillStar style={{ fill: "gold" }}></AiFillStar>
-        ) : (
-          <AiOutlineStar style={{ fill: "gold" }}></AiOutlineStar>
-        )}
-      </TouchableOpacity>
+      <View style={localStyles.actionsContainer}>
+        <TouchableOpacity
+          onPress={() => toggleLearn()}
+          style={localStyles.iconButton}
+        >
+          <FontAwesome6
+            name="graduation-cap"
+            size={20}
+            color={learn ? colors.primary : "gray"}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => toggleFavorite()}
+          style={localStyles.iconButton}
+        >
+          <FontAwesome
+            name={favorite ? "star" : "star-o"}
+            size={24}
+            color="gold"
+          />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const localStyles = StyleSheet.create({
   solutionContainer: {
-    flex: 1,
     flexDirection: "row",
-    padding: 5,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  notationText: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  iconButton: {
+    padding: 8,
   },
 });
