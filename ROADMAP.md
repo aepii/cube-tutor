@@ -1,6 +1,8 @@
 # CubeTutor — Roadmap
 
-_Last audited 2026-11-14 against the actual code. Supersedes the 2026-08-04 version. Verified state at audit time: `npx tsc --noEmit` fails (1 error, empty `applyR`), `npx jest` passes (1 test)._
+_Last audited 2026-11-14 against the actual code. Supersedes the 2026-08-04 version. Current state: `npx tsc --noEmit` passes, `npx jest` passes (1 test). Branch `cube-engine-groundwork`._
+
+**Where to start:** the task checklist is in [§6](#6-task-checklist). §2 lists what's already built. §3–§5 explain the *why* behind the tasks.
 
 ## 1. What this project is
 
@@ -15,24 +17,31 @@ An app that teaches speedcubing algorithms (OLL / PLL / F2L) with an interactive
 
 ---
 
-## 2. Uncommitted work in the tree (from ~Feb–Mar 2026)
+## 2. What's already built (the foundation)
 
-Last commit is 2026-02-26. Everything below was written after it and never committed:
+Everything in §6 builds on these. ✅ = works today.
 
-| File | Status | What it is |
-|---|---|---|
-| `frontend/package.json` / lockfile | modified | Added Jest: `test` / `test:watch` scripts, `jest-expo` preset, `jest`, `jest-expo`, `@types/jest` (these belong in `devDependencies`). |
-| `features/cube/types/cube.types.ts` | modified | Split `CubeData` into `FaceData[]`; added a face-index comment block (**the comment is wrong**, see §4.1 #7). |
-| `features/cube/helpers/geometry.ts` | modified | Swapped colors so index 2 = White, 3 = Yellow (White on top — correct); gray darkened. |
-| `features/cube/components/CubeViewer.tsx` | modified | Reads `cubeData` from `useCubeStore` instead of the hardcoded `DEFAULT_CUBE_DATA`. |
-| `features/cube/store/useCubeStore.ts` | new | Zustand store holding `cubeData` + `setCubeData`. |
-| `features/cube/types/move.types.ts`, `constants/move.constants.ts` | new | Move notation types (`R L U D F B M E S x y z` + modifiers). |
-| `features/cube/helpers/moveParser.ts` | new | `parseMove` / `parseAlgorithm` — tokenizes notation strings. Missing wide moves (§4.1 #1). |
-| `features/cube/helpers/cubeState.ts` | new | `rotateFaceMatrix` (works, tested) + empty `applyR` (breaks `tsc`). |
-| `frontend/tests/cubeState.test.ts` | new | One test for `rotateFaceMatrix`. |
-| `ROADMAP.md` | new | This file. |
+**Backend**
+- ✅ Auth API: `POST /v1/auth/register`, `/login`, `/refresh`, `/logout`; JWT access (15 min) + refresh (7 days) with rotation and revocation — `backend/app/api/routes/auth.py`
+- ✅ Algorithms API: `GET /v1/algs/` (cases + solutions + the user's favorite/learned flags), `POST /v1/algs/{id}/favorite`, `POST /v1/algs/{id}/learn` — `routes/algs.py`
+- ✅ Models: `User`, `RefreshToken`, `AlgorithmCase`, `AlgorithmSolution`, `UserAlgorithm` — `backend/app/models/`
+- ✅ Seed script loads the scraped JSON into Postgres, safe to re-run — `backend/seed/seed_algorithms.py`
+- ✅ Scraper + data: 119 cases / 934 solutions in `shared/data/raw/*.json`
+- ✅ Docker Compose: backend, Postgres, Redis, pgAdmin, Celery worker
+- ⚠️ Celery: wired end to end, but the only task is a fake (`shared/tasks.py`)
 
-**Action:** fix the face-index comment, move Jest packages to `devDependencies`, stub `applyR` so `tsc` passes (or delete it if adopting the sticker model in §3), then commit.
+**Frontend**
+- ✅ Login / register screens — `app/(auth)/`
+- ✅ Auth store with token persistence (SecureStore on native, localStorage on web) and route guarding — `features/auth/`, `app/_layout.tsx`
+- ✅ API client attaching the access token — `shared/api/client.ts`
+- ✅ Learn tab: algorithm list with favorite / learned toggles (optimistic UI) — `app/(tabs)/learn.tsx`, `features/learn/`
+- ✅ 3D cube renders from a `CubeData` state (27 cubies, per-face vertex colors) — `features/cube/helpers/math.ts`, `geometry.ts`
+- ✅ Free rotation (drag, two-finger twist) via world-axis quaternions, pinch zoom — `hooks/useCubeGestures.ts`, `useCubeRotation.ts`
+- ✅ Cube state in a Zustand store; the viewer reads from it — `store/useCubeStore.ts`
+- ✅ Move notation types + parser (`"R U R' U'"` → `Move[]`) — `helpers/moveParser.ts` ⚠️ no wide moves yet
+- ✅ `rotateFaceMatrix` + 1 Jest test — `helpers/cubeState.ts`, `tests/`
+- ❌ Layer turning: `useCubeTurn` is empty, `applyR` is a stub, `Cubie` only logs on touch
+- ❌ No tab bar, no logout button
 
 ---
 
@@ -81,7 +90,7 @@ Still valid from the old roadmap: keep one canonical state and convert input fro
 4. **Refresh-token storage is slow and only partially hashed.** `/refresh` and `/logout` load *every* unrevoked token for the user and bcrypt-verify each one (O(n) slow hashes; rows accumulate per login, never cleaned up). bcrypt only reads the first 72 bytes — for a JWT that's the header plus the start of the payload, so the signature is never part of the hash. **Fix:** store `sha256(token)` in the indexed `hashed_token` column and look it up directly; add a cleanup for expired/revoked rows.
 5. **Alembic can't build a fresh DB.** `3d35e0512814_init.py` is empty (`pass`); `e21c1e12ed8e` alters tables no migration creates. It only works because `init_db()` calls `create_all` on startup. **Fix:** remove `create_all`, delete both migrations, autogenerate one baseline, run `alembic upgrade head` on container start.
 6. **Backend image broken without the bind mount.** `backend/dockerfile` builds from `./backend`, so `shared/` is never copied, but `routes/images.py` imports `shared.tasks`. The seed script also depends on cwd-relative `shared/data/raw`.
-7. **Face-index comment is wrong.** `cube.types.ts` says 2 = Yellow (Down), 3 = White (Top). Actual code: index = three.js `BoxGeometry` face slot = `+X, -X, +Y, -Y, +Z, -Z` = **R, L, U, D, F, B**, and `geometry.ts` colors 2 = White (Up), 3 = Yellow (Down). Every move table depends on this — fix it before writing any.
+7. ✅ _Fixed in `f8a5636`._ **Face-index comment was wrong.** `cube.types.ts` says 2 = Yellow (Down), 3 = White (Top). Actual code: index = three.js `BoxGeometry` face slot = `+X, -X, +Y, -Y, +Z, -Z` = **R, L, U, D, F, B**, and `geometry.ts` colors 2 = White (Up), 3 = Yellow (Down). Every move table depends on this — fix it before writing any.
 8. Smaller:
    - `useAuthStore.signIn` `console.log`s the token.
    - No unique constraint on `UserAlgorithm(user_id, algorithm_id)` → double-tap race creates duplicates. Same for `AlgorithmCase(subset, name, subgroup)`.
@@ -132,16 +141,115 @@ Interview framing: color classification could run on-device; the queue is justif
 
 ---
 
-## 6. Recommended order
+## 6. Task checklist
 
-Legend: **[you]** = hand-write it (core logic, interview material); **[delegate]** = let Claude Code do it, then review the diff.
+Legend: **[you]** = hand-write it (core logic, interview material). **[delegate]** = let Claude Code do it, then review the diff. Each phase lists what it **builds on** and when it's **done**.
 
-1. **Commit the pending work** (§2): fix face-index comment, move Jest to devDeps, make `tsc` pass. **[delegate]**
-2. **Cube engine + parser** (§3.1, §3.2, §4.1 #1): sticker model, `applyMove` / `applyAlgorithm`, wide moves in the parser, identity tests + the 934-solution data test. **[you]**, with Claude reviewing.
-3. **App navigation + auth fixes** (§4.1 #2, #3): `(tabs)/_layout.tsx`, logout button calling `/v1/auth/logout`, store both tokens, refresh-and-retry-once on 401 with a single in-flight refresh. **[delegate]**
-4. **Backend hardening** (§4.1 #4–6, #8; §4.2): SHA-256 refresh tokens, unique constraints, `ORDER BY` + subset filter, Alembic baseline, unified backend/worker image, UTF-8 + trimmed requirements, idempotent `PUT` endpoints. **[delegate]**, review carefully.
-5. **Layer turning** (§3.3, §3.4): single gesture with start-raycast, screen→cube-space direction, pivot-group animation (~150–200 ms), `isTurning` lock, commit to store. **[you]** — this was the blocker last time.
-6. **Learn ↔ Playground integration**: tap an algorithm → apply its `setup` → play the solution move by move; scramble / reset / undo in the store. **[split]**
-7. **Learn tab polish**: TanStack Query, `SectionList` grouped by subset, active tab styling, loading/retry, filter by favorited/learned, cube thumbnails per case. **[delegate]**
-8. **Scan pipeline** (§5): design the worker + CV yourself **[you]**; API endpoints, model, migration, Celery config **[delegate]**.
-9. **Ship it**: GitHub Actions (tsc, jest, lint, pytest), backend tests (auth + algs with a test DB), README with architecture diagram + demo GIF, deploy (e.g. API on Fly/Railway, web build on Vercel/Netlify). **[delegate]** — the README/GIF matters a lot for a resume project.
+```
+Phase 1 (groundwork) ──► Phase 2 (engine) ──► Phase 5 (layer turning) ──► Phase 6 (Learn ↔ cube)
+                                    │                                            │
+                                    └──────────────► Phase 8 (scan pipeline) ◄───┘
+Phase 3 (nav + auth) ─┐
+Phase 4 (backend)  ───┼─► independent; do any time, in parallel with the above
+Phase 7 (Learn UI) ───┘
+Phase 9 (ship) ──► last
+```
+
+### Phase 1 — Commit pending groundwork ✅ (`f8a5636`)
+- [x] Fix face-index comment in `cube.types.ts`
+- [x] Move `jest`, `jest-expo`, `@types/jest` to `devDependencies`
+- [x] Stub `applyR` so `tsc` passes
+- [x] Commit store, parser, move types, `rotateFaceMatrix`, test, roadmap
+- [ ] Merge `cube-engine-groundwork` into `master`
+
+### Phase 2 — Cube engine + parser **[you]**
+_Builds on:_ move types + parser (`move.types.ts`, `moveParser.ts`), cube store, Jest setup. _See §3.1, §3.2._
+- [ ] Write the identity tests first (they fail until the engine exists):
+  - [ ] each move then its inverse = solved; any move ×4 = solved
+  - [ ] `(R U R' U')` ×6 = solved
+  - [ ] every solution in `shared/data/raw/*.json` solves its own `setup` (934 cases)
+- [ ] Sticker model: `Sticker { pos, normal, color }`, `createSolvedCube()`, `isSolved()`
+- [ ] Integer 90° rotation matrices for x / y / z axes
+- [ ] Move table: base → `{ axis, layers, direction }` for `R L U D F B`, `M E S`, `x y z`, and wide `r l u d f b`
+- [ ] `applyMove(state, move)` and `applyAlgorithm(state, moves)`
+- [ ] Parser: accept wide moves (lowercase + `Rw`), normalize `2'` → `2`, ignore parentheses
+- [ ] Connect to the renderer: sticker state → what `generateCubies` needs (or rewrite `generateCubies` to read stickers directly); delete `rotateFaceMatrix` / `applyR` if unused
+- [ ] Facelet-string export (54 chars, URFDLB order), needed later for kociemba / scans
+- [ ] Store actions: `applyMove`, `applyAlgorithm`, `reset`, `scramble`
+
+**Done when:** all identity tests + the 934-solution data test pass, and a dev-only button that runs `scramble` visibly changes the 3D cube.
+
+### Phase 3 — App navigation + auth fixes **[delegate]**
+_Builds on:_ existing auth store, API client, backend `/refresh` + `/logout`. _See §4.1 #2, #3._
+- [ ] Add `app/(tabs)/_layout.tsx` with a Learn / Playground tab bar
+- [ ] Logout button that calls `POST /v1/auth/logout` and clears both tokens
+- [ ] Store `refresh_token` alongside `access_token` on login / register
+- [ ] 401 interceptor: refresh once (single in-flight refresh shared by concurrent requests), retry the request, sign out only if refresh fails
+- [ ] `checkToken` on startup: if the access token is expired but the refresh token is valid → refresh instead of logging out
+- [ ] Remove `console.log(newToken)` from `signIn`
+- [ ] Fix `app/index.tsx` redirect flicker
+
+**Done when:** you can stay logged in past 15 minutes, switch tabs, and log out.
+
+### Phase 4 — Backend hardening **[delegate]**
+_Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 and §4.2._
+- [ ] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
+- [ ] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`
+- [ ] Catch `IntegrityError` on register → 400
+- [ ] `GET /v1/algs`: `ORDER BY`, optional `?subset=` filter
+- [ ] Replace toggle endpoints with `PUT /v1/algs/{id}/favorite` / `/learn` taking `{ "value": bool }` (shared upsert helper); update the frontend service
+- [ ] Alembic: remove `create_all` from startup, replace both migrations with one baseline, run `alembic upgrade head` on container start
+- [ ] One Python package + one image for backend and worker (two commands); drop the `shared/` bind-mount dependency
+- [ ] Convert `requirements.txt` files to UTF-8 and trim unused packages (or move to `uv` + `pyproject.toml`)
+- [ ] Settings: CORS origins from env, SQL `echo` off by default, drop deprecated `Field(env=...)`
+- [ ] pytest suite: auth flow + algs endpoints against a test DB
+
+**Done when:** `docker compose up` on an empty DB migrates, seeds, and passes pytest.
+
+### Phase 5 — Layer turning **[you]**
+_Builds on:_ **Phase 2 engine** (`applyMove`), existing free rotation (`cubeGroupRef` quaternion). _See §3.3, §3.4._
+- [ ] Replace the R3F `onPointerDown` + `orbitalControlsEnabled` flag with one RNGH pan that raycasts on start (hit cubie → turn, miss → orbit)
+- [ ] On drag: transform the screen-space drag vector by the inverse cube quaternion → pick axis, layer, direction → a `Move`
+- [ ] Implement `useCubeTurn`: animate the affected layer (~150–200 ms) in a pivot group, then commit via `applyMove` and rebuild meshes
+- [ ] `isTurning` lock in the store so turns don't overlap
+- [ ] Remove the `console.log` in `Cubie.tsx`; dispose old geometries
+
+**Done when:** you can flip the cube upside down, swipe the layer on the right of the screen, and the layer that's visually on the right turns the expected direction.
+
+### Phase 6 — Learn ↔ Playground integration **[split]**
+_Builds on:_ Phase 2 (`applyAlgorithm`), Phase 5 (animation), Phase 3 (tabs), existing Learn list.
+- [ ] Tap a solution in Learn → open the cube with the case's `setup` applied
+- [ ] Play / step through the solution move by move with animation; highlight the current move in the notation
+- [ ] Playground controls: scramble, reset, undo/redo (move history in the store)
+
+**Done when:** tapping any OLL/PLL/F2L solution plays it on the cube and ends solved.
+
+### Phase 7 — Learn tab polish **[delegate]**
+_Builds on:_ existing Learn tab, Phase 4 endpoint changes. Independent of the cube work.
+- [ ] TanStack Query for algorithms (loading, error + retry, optimistic updates); remove the `useState` copies in `SolutionDetail`
+- [ ] `SectionList` grouped by subset (no nested `FlatList`)
+- [ ] Active styling on the F2L orientation tabs
+- [ ] Filter by favorited / learned; search by case name
+- [ ] Remove unused deps (§4.2); pick NativeWind or `StyleSheet`
+- [ ] Later (after Phase 2): small cube thumbnail per case
+
+### Phase 8 — Scan pipeline **[you: worker/CV]**, **[delegate: API/infra]**
+_Builds on:_ **Phase 2** (facelet import/export, `applyAlgorithm`), **Phase 4** (single backend/worker package, Alembic), existing Redis + Celery. _See §5._
+- [ ] `Scan` model + migration (`status`, `images`, `result`, `error`, `user_id`)
+- [ ] `POST /v1/scans` (upload 6 images → store → enqueue `process_scan(scan_id)` → 202) and `GET /v1/scans/{id}`
+- [ ] Image storage (volume or MinIO); size/type limits
+- [ ] Celery config: `scans` queue, `acks_late`, prefetch 1, time limits, retries for transient errors only
+- [ ] Worker: grid detection → sample stickers → CIELAB classification calibrated on centers → validate (9 of each color, solvable) → `kociemba` solve
+- [ ] App: camera capture flow (6 faces with an on-screen guide), status polling
+- [ ] Sticker correction screen before solving
+- [ ] Load the scanned state into the cube and play the solution
+- [ ] Flower in docker-compose
+
+**Done when:** you scan a real scrambled cube, correct at most a couple of stickers, and watch it solve.
+
+### Phase 9 — Ship it **[delegate]**
+- [ ] GitHub Actions: `tsc`, `jest`, `expo lint`, `pytest`
+- [ ] README: what it is, architecture diagram, demo GIF, how to run locally
+- [ ] Deploy: API + Postgres + Redis + worker (e.g. Fly / Railway), web build (Vercel / Netlify)
+- [ ] Decide whether `ROADMAP.md` stays public as a design doc
+
