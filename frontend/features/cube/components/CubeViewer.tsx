@@ -1,5 +1,5 @@
 import { Canvas } from "@react-three/fiber";
-import { DEFAULT_CUBE_DATA } from "@/features/cube/constants/cube.constants";
+import { useCubeStore } from "@/features/cube/store/useCubeStore";
 import { colors } from "@/shared/theme/colors";
 import {
   GestureDetector,
@@ -21,6 +21,8 @@ export default function CubeViewer() {
     setTurnInput,
   } = useCubeGestures();
 
+  const { cubeData } = useCubeStore();
+
   return (
     <GestureHandlerRootView>
       <GestureDetector gesture={composedGestures}>
@@ -31,7 +33,7 @@ export default function CubeViewer() {
           <CubeCamera zoomScale={zoomScale} />
           <CubeLighting />
           <Cube
-            cubeData={DEFAULT_CUBE_DATA}
+            cubeData={cubeData}
             setOrbitalControlsEnabled={setOrbitalControlsEnabled}
             rotationState={rotationState}
             turnInput={turnInput}
