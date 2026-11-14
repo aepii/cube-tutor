@@ -68,6 +68,7 @@ services:
   celery:
     build: ./worker
     container_name: cubetutor_celery
+    restart: always
     command: celery -A main worker --loglevel=info
     volumes:
       - ./worker:/worker
