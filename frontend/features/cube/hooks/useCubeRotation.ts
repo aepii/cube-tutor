@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/features/cube/three/fiber";
 import * as THREE from "three";
 import { RotationState } from "@/features/cube/types/gesture.types";
 
