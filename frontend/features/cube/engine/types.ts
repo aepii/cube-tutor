@@ -7,7 +7,7 @@ export type Vec3 = readonly [number, number, number];
 export type Axis = 0 | 1 | 2; // x, y, z
 
 // A sticker's color is identified by the face it sits on when the cube is solved.
-// Same numbering as FaceIndex in types/cube.types.ts:
+// Same numbering as the renderer and the face-slot order (+X -X +Y -Y +Z -Z):
 //   0 = R (red), 1 = L (orange), 2 = U (white), 3 = D (yellow), 4 = F (green), 5 = B (blue)
 export type Color = 0 | 1 | 2 | 3 | 4 | 5;
 

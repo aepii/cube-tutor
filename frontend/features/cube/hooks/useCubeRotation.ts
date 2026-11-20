@@ -1,10 +1,18 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useFrame } from "@/features/cube/three/fiber";
 import * as THREE from "three";
 import { RotationState } from "@/features/cube/types/gesture.types";
+import { CAMERA_CONSTANTS } from "@/features/cube/constants/camera.constants";
 
 export function useCubeRotation(rotationState: RotationState) {
   const cubeGroupRef = useRef<THREE.Group>(null);
+
+  // Start in a three-quarter view. Set once on mount (not as a prop), so
+  // re-renders never reset the orientation the user has dragged to.
+  useLayoutEffect(() => {
+    const { x, y } = CAMERA_CONSTANTS.INITIAL_TILT;
+    cubeGroupRef.current?.quaternion.setFromEuler(new THREE.Euler(x, y, 0, "XYZ"));
+  }, []);
 
   useFrame(() => {
     if (!cubeGroupRef.current) return;

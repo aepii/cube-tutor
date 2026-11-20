@@ -1,16 +1,42 @@
 import { create } from "zustand";
-import { CubeData } from "@/features/cube/types/cube.types";
-import { DEFAULT_CUBE_DATA } from "@/features/cube/constants/cube.constants";
+import {
+  CubeState,
+  applyAlgorithm,
+  createSolvedCube,
+  randomScramble,
+} from "@/features/cube/engine";
+import { parseAlgorithm } from "@/features/cube/helpers/moveParser";
 
-interface CubeState {
-  cubeData: CubeData;
-  setCubeData: (cubeData: CubeData) => void;
+interface CubeStore {
+  // Engine state: 54 stickers. The renderer draws directly from this.
+  cube: CubeState;
+  // The last scramble applied, for display (null when solved/reset)
+  lastScramble: string | null;
+
+  // Applies an algorithm instantly (no animation yet), e.g. "R U R' U'"
+  applyAlgorithm: (alg: string) => void;
+  // Resets to solved, then applies a random 20-move scramble
+  scramble: () => void;
+  reset: () => void;
 }
 
-export const useCubeStore = create<CubeState>((set) => ({
-  cubeData: DEFAULT_CUBE_DATA,
+export const useCubeStore = create<CubeStore>((set) => ({
+  cube: createSolvedCube(),
+  lastScramble: null,
 
-  setCubeData: (cubeData: CubeData) => {
-    set({ cubeData: cubeData });
+  applyAlgorithm: (alg) => {
+    set((state) => ({ cube: applyAlgorithm(state.cube, parseAlgorithm(alg)) }));
+  },
+
+  scramble: () => {
+    const scramble = randomScramble();
+    set({
+      cube: applyAlgorithm(createSolvedCube(), parseAlgorithm(scramble)),
+      lastScramble: scramble,
+    });
+  },
+
+  reset: () => {
+    set({ cube: createSolvedCube(), lastScramble: null });
   },
 }));

@@ -1,24 +1,19 @@
-import { CubeData, FaceIndex } from "@/features/cube/types/cube.types";
+// Geometry of the rendered cube. Cubies sit on an integer grid (spacing 1),
+// so sizes below are fractions of one cubie.
+export const RENDER_CONSTANTS = {
+  // Dark rounded core of each piece; the gap between cores shows as dark seams
+  CORE_SIZE: 0.96,
+  CORE_RADIUS: 0.09,
+  CORE_SEGMENTS: 4,
 
-export const CUBE_SIZE = 3;
-
-export const CUBE_CONSTANTS = {
-  CUBIE_SIZE: 0.95,
-  HOVER_BRIGHTNESS_MULTIPLIER: 1.5,
-  DEFAULT_FACE_COLOR_INDEX: 6 as FaceIndex,
+  // Colored rounded tile on each outer face (stickerless look)
+  TILE_SIZE: 0.9, // final width including the bevel
+  TILE_RADIUS: 0.12,
+  TILE_DEPTH: 0.012,
+  TILE_BEVEL: 0.012,
+  TILE_BEVEL_SEGMENTS: 3,
+  TILE_CURVE_SEGMENTS: 8,
 } as const;
 
-export const GEOMETRY_CONSTANTS = {
-  VERTICES_PER_FACE: 6,
-  TOTAL_VERTICES: 36,
-  COLOR_COMPONENTS_PER_VERTEX: 3,
-} as const;
-
-export const DEFAULT_CUBE_DATA: CubeData = [
-  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(0)), 
-  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(1)), 
-  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(2)), 
-  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(3)), 
-  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(4)), 
-  Array(CUBE_SIZE).fill(null).map(() => Array(CUBE_SIZE).fill(5)),
-];
+// Distance from a cubie's center to the outer surface of its core
+export const CORE_HALF = RENDER_CONSTANTS.CORE_SIZE / 2;
