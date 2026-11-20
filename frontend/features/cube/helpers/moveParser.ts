@@ -1,28 +1,41 @@
 import {
-  MODIFIER_META,
   VALID_BASES,
   VALID_MODIFIERS,
 } from "@/features/cube/constants/move.constants";
-
 import { Move, MoveBase, MoveModifier } from "@/features/cube/types/move.types";
 
+// Parses one token such as "R", "U'", "r2", "Rw'", "M2'".
 export function parseMove(token: string): Move {
-  const base = token[0] as MoveBase;
+  let base = token[0];
+  let rest = token.slice(1);
+
+  // "Rw" style wide moves are the same as lowercase "r"
+  if (rest.startsWith("w") && "RLUDFB".includes(base)) {
+    base = base.toLowerCase();
+    rest = rest.slice(1);
+  }
 
   if (!VALID_BASES.has(base)) {
-    throw new Error(`Invalid move base: "${base}"`);
+    throw new Error(`Invalid move: "${token}"`);
   }
 
-  const modifier = token.slice(1) as MoveModifier;
+  // A half turn has no direction, so "2'" is the same move as "2"
+  const modifier = rest === "2'" ? "2" : rest;
 
   if (!VALID_MODIFIERS.has(modifier)) {
-    throw new Error(`Invalid modifier: "${modifier}"`);
+    throw new Error(`Invalid move: "${token}"`);
   }
 
-  return { base, modifier };
+  return { base: base as MoveBase, modifier: modifier as MoveModifier };
 }
 
+// Parses a whole algorithm string, e.g. "(R U R' U') y r2".
+// Parentheses (used for grouping/finger tricks) are ignored.
 export function parseAlgorithm(alg: string): Move[] {
-  const tokens = alg.trim().split(/\s+/).filter(Boolean);
-  return tokens.map(parseMove);
+  return alg
+    .replace(/[()]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(parseMove);
 }
