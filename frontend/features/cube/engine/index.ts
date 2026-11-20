@@ -12,3 +12,4 @@ export {
 export { MOVE_TABLE, applyAlgorithm, applyMove, quarterTurns } from "./moves";
 export { toFacelets } from "./facelets";
 export { rotateQuarter } from "./rotation";
+export { randomScramble } from "./scramble";

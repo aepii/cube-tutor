@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native";
 import { Canvas } from "@/features/cube/three/fiber";
 import { useCubeStore } from "@/features/cube/store/useCubeStore";
 import { colors } from "@/shared/theme/colors";
@@ -9,22 +10,16 @@ import { useCubeGestures } from "@/features/cube/hooks/useCubeGestures";
 import Cube from "./Cube";
 import CubeCamera from "./CubeCamera";
 import CubeLighting from "./CubeLighting";
+import DevCubeControls from "./DevCubeControls";
 
 export default function CubeViewer() {
-  const {
-    orbitalControlsEnabled,
-    setOrbitalControlsEnabled,
-    rotationState,
-    zoomScale,
-    composedGestures,
-    turnInput,
-    setTurnInput,
-  } = useCubeGestures();
+  const { setOrbitalControlsEnabled, rotationState, zoomScale, composedGestures } =
+    useCubeGestures();
 
-  const { cubeData } = useCubeStore();
+  const cube = useCubeStore((state) => state.cube);
 
   return (
-    <GestureHandlerRootView>
+    <GestureHandlerRootView style={styles.root}>
       <GestureDetector gesture={composedGestures}>
         <Canvas
           // Render only when something changes (gestures call invalidate()),
@@ -32,6 +27,8 @@ export default function CubeViewer() {
           frameloop="demand"
           dpr={[1, 2]}
           gl={{ antialias: true }}
+          // No tone mapping, so sticker colors render as defined in the palette
+          flat
           style={{
             backgroundColor: colors.primary,
             // Web only: stop the browser from scrolling/zooming the page
@@ -44,14 +41,17 @@ export default function CubeViewer() {
           <CubeCamera zoomScale={zoomScale} />
           <CubeLighting />
           <Cube
-            cubeData={cubeData}
+            cube={cube}
             setOrbitalControlsEnabled={setOrbitalControlsEnabled}
             rotationState={rotationState}
-            turnInput={turnInput}
-            setTurnInput={setTurnInput}
           />
         </Canvas>
       </GestureDetector>
+      {__DEV__ && <DevCubeControls />}
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
