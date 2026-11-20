@@ -12,6 +12,28 @@ module.exports = defineConfig([
     rules: reactThree.configs.recommended.rules,
   },
   {
+    // R3F has separate web and native builds. Import it only through
+    // features/cube/three/fiber(.native).ts, which picks the right one.
+    ignores: ["features/cube/three/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@react-three/fiber",
+              message: 'Import from "@/features/cube/three/fiber" instead.',
+            },
+            {
+              name: "@react-three/fiber/native",
+              message: 'Import from "@/features/cube/three/fiber" instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: ["dist/*"],
   },
 ]);

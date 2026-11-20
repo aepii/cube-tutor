@@ -1,4 +1,4 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas } from "@/features/cube/three/fiber";
 import { useCubeStore } from "@/features/cube/store/useCubeStore";
 import { colors } from "@/shared/theme/colors";
 import {
@@ -27,7 +27,18 @@ export default function CubeViewer() {
     <GestureHandlerRootView>
       <GestureDetector gesture={composedGestures}>
         <Canvas
-          style={{ backgroundColor: colors.primary }}
+          // Render only when something changes (gestures call invalidate()),
+          // so the GPU idles when the cube is still. Saves battery on mobile.
+          frameloop="demand"
+          dpr={[1, 2]}
+          gl={{ antialias: true }}
+          style={{
+            backgroundColor: colors.primary,
+            // Web only: stop the browser from scrolling/zooming the page
+            // or selecting text while dragging the cube. Ignored on native.
+            touchAction: "none",
+            userSelect: "none",
+          }}
           onPointerUp={() => setOrbitalControlsEnabled(true)}
         >
           <CubeCamera zoomScale={zoomScale} />
