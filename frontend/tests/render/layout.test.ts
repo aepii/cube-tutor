@@ -1,55 +1,78 @@
-import { Quaternion, Vector3 } from "three";
 import {
   COLORS,
+  CubeState,
   applyAlgorithm,
   createSolvedCube,
 } from "@/features/cube/engine";
 import { parseAlgorithm } from "@/features/cube/helpers/moveParser";
-import { CORE_HALF } from "@/features/cube/constants/cube.constants";
-import { CUBIE_POSITIONS, tilePlacement } from "@/features/cube/render/layout";
+import {
+  FACE_SLOT_NORMALS,
+  PIECE_POSITIONS,
+  faceSlot,
+  piecesFromState,
+} from "@/features/cube/render/layout";
 
-const close = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+const scrambled = (): CubeState =>
+  applyAlgorithm(createSolvedCube(), parseAlgorithm("R U2 F' L D B2 r M' y"));
 
-describe("CUBIE_POSITIONS", () => {
-  it("has the 26 visible cubies and skips the hidden center", () => {
-    expect(CUBIE_POSITIONS).toHaveLength(26);
-    expect(CUBIE_POSITIONS.some(([x, y, z]) => x === 0 && y === 0 && z === 0)).toBe(false);
-    expect(new Set(CUBIE_POSITIONS.map((p) => p.join(","))).size).toBe(26);
+describe("face slots", () => {
+  it("follow BoxGeometry group order, which matches engine colors R L U D F B", () => {
+    expect(FACE_SLOT_NORMALS).toEqual([
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ]);
+    FACE_SLOT_NORMALS.forEach((n, i) => expect(faceSlot(n)).toBe(i));
   });
 });
 
-describe("tilePlacement", () => {
-  const solved = createSolvedCube();
-
-  it("places every tile on the outer surface of its cubie, along its normal", () => {
-    for (const sticker of solved) {
-      const { position } = tilePlacement(sticker);
-      for (let axis = 0; axis < 3; axis++) {
-        expect(
-          close(position[axis], sticker.pos[axis] + sticker.normal[axis] * CORE_HALF),
-        ).toBe(true);
-      }
-    }
+describe("PIECE_POSITIONS", () => {
+  it("has all 27 grid positions, including the hidden center", () => {
+    expect(PIECE_POSITIONS).toHaveLength(27);
+    expect(new Set(PIECE_POSITIONS.map((p) => p.join(","))).size).toBe(27);
   });
+});
 
-  it("rotates the tile's +Z face to point along the sticker's normal", () => {
-    // Includes the -Z face, where the rotation is a 180° turn
-    for (const sticker of solved) {
-      const [x, y, z, w] = tilePlacement(sticker).quaternion;
-      const facing = new Vector3(0, 0, 1).applyQuaternion(new Quaternion(x, y, z, w));
-      expect(close(facing.x, sticker.normal[0])).toBe(true);
-      expect(close(facing.y, sticker.normal[1])).toBe(true);
-      expect(close(facing.z, sticker.normal[2])).toBe(true);
-    }
-  });
+describe.each([
+  ["solved", createSolvedCube],
+  ["scrambled", scrambled],
+])("piecesFromState (%s)", (_name, makeCube) => {
+  const pieces = piecesFromState(makeCube());
 
-  it("gives 54 distinct tile positions, 9 per face, on a scrambled cube too", () => {
-    const scrambled = applyAlgorithm(solved, parseAlgorithm("R U2 F' L D B2 r M' y"));
-    const keys = scrambled.map((s) => tilePlacement(s).position.map((n) => n.toFixed(6)).join(","));
-    expect(new Set(keys).size).toBe(54);
-
+  it("colors exactly 54 faces, 9 of each color", () => {
+    const colored = pieces.flatMap((p) => p.faces.filter((c) => c !== null));
+    expect(colored).toHaveLength(54);
     for (const color of COLORS) {
-      expect(scrambled.filter((s) => s.color === color)).toHaveLength(9);
+      expect(colored.filter((c) => c === color)).toHaveLength(9);
     }
   });
+
+  it("gives corners 3 colored faces, edges 2, centers 1, the core 0", () => {
+    for (const piece of pieces) {
+      const outerAxes = piece.pos.filter((c) => c !== 0).length;
+      expect(piece.faces.filter((c) => c !== null)).toHaveLength(outerAxes);
+    }
+  });
+
+  it("only colors faces that point outward", () => {
+    for (const piece of pieces) {
+      piece.faces.forEach((color, slot) => {
+        if (color === null) return;
+        const n = FACE_SLOT_NORMALS[slot];
+        const outward = piece.pos[0] * n[0] + piece.pos[1] * n[1] + piece.pos[2] * n[2];
+        expect(outward).toBe(1);
+      });
+    }
+  });
+});
+
+it("solved cube: each outer face slot shows its own color", () => {
+  for (const piece of piecesFromState(createSolvedCube())) {
+    piece.faces.forEach((color, slot) => {
+      if (color !== null) expect(color).toBe(slot);
+    });
+  }
 });

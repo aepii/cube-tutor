@@ -11,8 +11,9 @@ export const STICKER_COLORS: Record<Color, string> = {
   5: "#0051ba", // blue   (B)
 };
 
-// Plastic core visible in the seams between tiles
-export const CORE_COLOR = "#141414";
+// Internal plastic: the inner faces of pieces, visible only in the seams and
+// mid-turn. Dark like most stickerless speedcubes ("#f2f2f2" for a white core).
+export const INTERNAL_COLOR = "#141414";
 
-// How strongly a touched tile glows (fraction of its own color)
+// How strongly a touched face glows (fraction of its own color)
 export const HIGHLIGHT_EMISSIVE_INTENSITY = 0.35;

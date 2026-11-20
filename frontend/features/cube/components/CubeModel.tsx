@@ -2,13 +2,12 @@ import { useMemo, useState } from "react";
 import { ThreeEvent } from "@/features/cube/three/fiber";
 import { CubeState } from "@/features/cube/engine";
 import { SetOrbitalControlsEnabled } from "@/features/cube/types/gesture.types";
-import { CUBIE_POSITIONS, tilePlacement } from "@/features/cube/render/layout";
+import { piecesFromState, PieceView } from "@/features/cube/render/layout";
 import {
-  coreGeometry,
-  coreMaterial,
-  highlightedTileMaterials,
-  tileGeometry,
-  tileMaterials,
+  faceMaterials,
+  highlightedFaceMaterials,
+  internalMaterial,
+  pieceGeometry,
 } from "@/features/cube/render/assets";
 
 interface CubeModelProps {
@@ -16,63 +15,63 @@ interface CubeModelProps {
   setOrbitalControlsEnabled: SetOrbitalControlsEnabled;
 }
 
-// Stickerless speedcube: a dark rounded core per piece plus one rounded colored
-// tile per sticker, drawn straight from engine state. Tiles are keyed by sticker
-// index (stable across moves), so a move only updates their transforms.
+// A touched face: which piece, and which of its 6 face slots
+interface FaceRef {
+  piece: string;
+  slot: number;
+}
+
+// Stickerless speedcube: 27 rounded pieces of colored plastic, drawn straight
+// from engine state. Each piece is one mesh with a material per face slot:
+// outer faces use the sticker color, inner faces the internal color.
 export default function CubeModel({ cube, setOrbitalControlsEnabled }: CubeModelProps) {
-  const [highlighted, setHighlighted] = useState<number | null>(null);
+  const [highlighted, setHighlighted] = useState<FaceRef | null>(null);
+  const pieces = useMemo(() => piecesFromState(cube), [cube]);
 
-  const tiles = useMemo(
-    () => cube.map((sticker, index) => ({ index, sticker, ...tilePlacement(sticker) })),
-    [cube],
-  );
+  const materialsFor = (piece: PieceView) =>
+    piece.faces.map((color, slot) => {
+      if (color === null) return internalMaterial;
+      const isHighlighted = highlighted?.piece === piece.key && highlighted.slot === slot;
+      return isHighlighted ? highlightedFaceMaterials[color] : faceMaterials[color];
+    });
 
-  // Touching the cube blocks orbiting (current behavior; replaced by the
-  // unified input layer in a later PR)
-  const onPointerDown = (e: ThreeEvent<PointerEvent>, tileIndex?: number) => {
-    e.stopPropagation();
-    if (tileIndex !== undefined) setHighlighted(tileIndex);
-    setOrbitalControlsEnabled(false);
-  };
-  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    setHighlighted(null);
-    setOrbitalControlsEnabled(true);
+  // The raycast hit's materialIndex is the face slot that was touched.
+  // Only colored (outer) faces highlight.
+  const touchedFace = (e: ThreeEvent<PointerEvent>, piece: PieceView): FaceRef | null => {
+    const slot = e.face?.materialIndex;
+    return slot !== undefined && piece.faces[slot] !== null ? { piece: piece.key, slot } : null;
   };
 
   return (
     <group>
-      {CUBIE_POSITIONS.map((pos) => (
+      {pieces.map((piece) => (
         <mesh
-          key={pos.join(",")}
-          geometry={coreGeometry}
-          material={coreMaterial}
-          position={[pos[0], pos[1], pos[2]]}
-          onPointerDown={(e) => onPointerDown(e)}
-          onPointerUp={onPointerUp}
-        />
-      ))}
-
-      {tiles.map(({ index, sticker, position, quaternion }) => (
-        <mesh
-          key={index}
-          geometry={tileGeometry}
-          material={
-            highlighted === index
-              ? highlightedTileMaterials[sticker.color]
-              : tileMaterials[sticker.color]
-          }
-          position={position}
-          quaternion={quaternion}
-          onPointerDown={(e) => onPointerDown(e, index)}
-          onPointerUp={onPointerUp}
-          onPointerEnter={(e) => {
+          key={piece.key}
+          geometry={pieceGeometry}
+          material={materialsFor(piece)}
+          position={[piece.pos[0], piece.pos[1], piece.pos[2]]}
+          // Touching the cube blocks orbiting (current behavior; replaced by
+          // the unified input layer in a later PR)
+          onPointerDown={(e) => {
             e.stopPropagation();
-            setHighlighted(index);
+            setHighlighted(touchedFace(e, piece));
+            setOrbitalControlsEnabled(false);
+          }}
+          onPointerUp={(e) => {
+            e.stopPropagation();
+            setHighlighted(null);
+            setOrbitalControlsEnabled(true);
+          }}
+          onPointerMove={(e) => {
+            e.stopPropagation();
+            const face = touchedFace(e, piece);
+            setHighlighted((current) =>
+              current?.piece === face?.piece && current?.slot === face?.slot ? current : face,
+            );
           }}
           onPointerLeave={(e) => {
             e.stopPropagation();
-            setHighlighted((current) => (current === index ? null : current));
+            setHighlighted((current) => (current?.piece === piece.key ? null : current));
           }}
         />
       ))}
