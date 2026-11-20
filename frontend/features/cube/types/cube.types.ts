@@ -1,4 +1,9 @@
-import { RotationState, SetOrbitalControlsEnabled, SetTurnInput, TurnInput } from "@/features/cube/types/gesture.types";
+import {
+  RotationState,
+  SetOrbitalControlsEnabled,
+  SetTurnInput,
+  TurnInput,
+} from "@/features/cube/types/gesture.types";
 
 export interface Coordinates {
   x: number;
@@ -6,8 +11,20 @@ export interface Coordinates {
   z: number;
 }
 
+/*
+Face index = three.js BoxGeometry face slot (+X, -X, +Y, -Y, +Z, -Z).
+See getFaceIndices (helpers/math.ts) and faceIndexToFaceColor (helpers/geometry.ts).
+0: Red    (Right, +X)
+1: Orange (Left,  -X)
+2: White  (Up,    +Y)
+3: Yellow (Down,  -Y)
+4: Green  (Front, +Z)
+5: Blue   (Back,  -Z)
+6: Gray   (Default / interior)
+*/
 export type FaceIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-export type CubeData = FaceIndex[][][];
+export type FaceData = FaceIndex[][];
+export type CubeData = FaceData[];
 
 export interface CubieData {
   key: string;
