@@ -9,6 +9,6 @@ export {
   isLastLayerOriented,
   isSolved,
 } from "./cube";
-export { MOVE_TABLE, applyAlgorithm, applyMove } from "./moves";
+export { MOVE_TABLE, applyAlgorithm, applyMove, quarterTurns } from "./moves";
 export { toFacelets } from "./facelets";
 export { rotateQuarter } from "./rotation";
