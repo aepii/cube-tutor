@@ -143,7 +143,7 @@ Interview framing: color classification could run on-device; the queue is justif
 
 ## 6. Task checklist
 
-Legend: **[you]** = hand-write it (core logic, interview material). **[delegate]** = let Claude Code do it, then review the diff. Each phase lists what it **builds on** and when it's **done**.
+Everything is built by Claude Code; you orchestrate and review. **[review closely]** = core logic worth reading line by line and being able to explain in interviews. **[review diff]** = skim the diff and check the "Done when". Each phase lists what it **builds on** and when it's **done**.
 
 ```
 Phase 1 (groundwork) ──► Phase 2 (engine) ──► Phase 5 (layer turning) ──► Phase 6 (Learn ↔ cube)
@@ -162,7 +162,7 @@ Phase 9 (ship) ──► last
 - [x] Commit store, parser, move types, `rotateFaceMatrix`, test, roadmap
 - [ ] Merge `cube-engine-groundwork` into `master`
 
-### Phase 2 — Cube engine + parser **[you]**
+### Phase 2 — Cube engine + parser **[review closely]** (test-first: tests from the chat skeleton land before the engine)
 _Builds on:_ move types + parser (`move.types.ts`, `moveParser.ts`), cube store, Jest setup. _See §3.1, §3.2._
 - [ ] Write the identity tests first (they fail until the engine exists):
   - [ ] each move then its inverse = solved; any move ×4 = solved
@@ -179,7 +179,7 @@ _Builds on:_ move types + parser (`move.types.ts`, `moveParser.ts`), cube store,
 
 **Done when:** all identity tests + the 934-solution data test pass, and a dev-only button that runs `scramble` visibly changes the 3D cube.
 
-### Phase 3 — App navigation + auth fixes **[delegate]**
+### Phase 3 — App navigation + auth fixes **[review diff]**
 _Builds on:_ existing auth store, API client, backend `/refresh` + `/logout`. _See §4.1 #2, #3._
 - [ ] Add `app/(tabs)/_layout.tsx` with a Learn / Playground tab bar
 - [ ] Logout button that calls `POST /v1/auth/logout` and clears both tokens
@@ -191,7 +191,7 @@ _Builds on:_ existing auth store, API client, backend `/refresh` + `/logout`. _S
 
 **Done when:** you can stay logged in past 15 minutes, switch tabs, and log out.
 
-### Phase 4 — Backend hardening **[delegate]**
+### Phase 4 — Backend hardening **[review diff]**
 _Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 and §4.2._
 - [ ] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
 - [ ] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`
@@ -206,7 +206,7 @@ _Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 a
 
 **Done when:** `docker compose up` on an empty DB migrates, seeds, and passes pytest.
 
-### Phase 5 — Layer turning **[you]**
+### Phase 5 — Layer turning **[review closely]** (see the 3D migration plan: rendering + input first, turning after Phase 2)
 _Builds on:_ **Phase 2 engine** (`applyMove`), existing free rotation (`cubeGroupRef` quaternion). _See §3.3, §3.4._
 - [ ] Replace the R3F `onPointerDown` + `orbitalControlsEnabled` flag with one RNGH pan that raycasts on start (hit cubie → turn, miss → orbit)
 - [ ] On drag: transform the screen-space drag vector by the inverse cube quaternion → pick axis, layer, direction → a `Move`
@@ -216,7 +216,7 @@ _Builds on:_ **Phase 2 engine** (`applyMove`), existing free rotation (`cubeGrou
 
 **Done when:** you can flip the cube upside down, swipe the layer on the right of the screen, and the layer that's visually on the right turns the expected direction.
 
-### Phase 6 — Learn ↔ Playground integration **[split]**
+### Phase 6 — Learn ↔ Playground integration **[review diff]**
 _Builds on:_ Phase 2 (`applyAlgorithm`), Phase 5 (animation), Phase 3 (tabs), existing Learn list.
 - [ ] Tap a solution in Learn → open the cube with the case's `setup` applied
 - [ ] Play / step through the solution move by move with animation; highlight the current move in the notation
@@ -224,7 +224,7 @@ _Builds on:_ Phase 2 (`applyAlgorithm`), Phase 5 (animation), Phase 3 (tabs), ex
 
 **Done when:** tapping any OLL/PLL/F2L solution plays it on the cube and ends solved.
 
-### Phase 7 — Learn tab polish **[delegate]**
+### Phase 7 — Learn tab polish **[review diff]**
 _Builds on:_ existing Learn tab, Phase 4 endpoint changes. Independent of the cube work.
 - [ ] TanStack Query for algorithms (loading, error + retry, optimistic updates); remove the `useState` copies in `SolutionDetail`
 - [ ] `SectionList` grouped by subset (no nested `FlatList`)
@@ -233,7 +233,7 @@ _Builds on:_ existing Learn tab, Phase 4 endpoint changes. Independent of the cu
 - [ ] Remove unused deps (§4.2); pick NativeWind or `StyleSheet`
 - [ ] Later (after Phase 2): small cube thumbnail per case
 
-### Phase 8 — Scan pipeline **[you: worker/CV]**, **[delegate: API/infra]**
+### Phase 8 — Scan pipeline **[review closely: worker/CV]**, **[review diff: API/infra]**
 _Builds on:_ **Phase 2** (facelet import/export, `applyAlgorithm`), **Phase 4** (single backend/worker package, Alembic), existing Redis + Celery. _See §5._
 - [ ] `Scan` model + migration (`status`, `images`, `result`, `error`, `user_id`)
 - [ ] `POST /v1/scans` (upload 6 images → store → enqueue `process_scan(scan_id)` → 202) and `GET /v1/scans/{id}`
@@ -247,7 +247,7 @@ _Builds on:_ **Phase 2** (facelet import/export, `applyAlgorithm`), **Phase 4** 
 
 **Done when:** you scan a real scrambled cube, correct at most a couple of stickers, and watch it solve.
 
-### Phase 9 — Ship it **[delegate]**
+### Phase 9 — Ship it **[review diff]**
 - [ ] GitHub Actions: `tsc`, `jest`, `expo lint`, `pytest`
 - [ ] README: what it is, architecture diagram, demo GIF, how to run locally
 - [ ] Deploy: API + Postgres + Redis + worker (e.g. Fly / Railway), web build (Vercel / Netlify)

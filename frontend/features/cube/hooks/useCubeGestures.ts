@@ -4,6 +4,7 @@ import { useSharedValue } from "react-native-reanimated";
 import { calculateXYRotationDelta, calculateZRotationDelta } from "@/features/cube/helpers/rotation";
 import { GESTURE_CONSTANTS } from "@/features/cube/constants/gesture.constants";
 import { TurnInput } from "@/features/cube/types/gesture.types";
+import { invalidate } from "@/features/cube/three/fiber";
 
 export function useCubeGestures() {
   const [orbitalControlsEnabled, setOrbitalControlsEnabled] = useState(true);
@@ -36,6 +37,7 @@ export function useCubeGestures() {
         prevRotation.value.y
       );
 
+      invalidate();
       rotation.value = {
         ...rotation.value,
         x: rotation.value.x + dy,
@@ -59,6 +61,7 @@ export function useCubeGestures() {
   const zoomGesture = Gesture.Pinch()
     .runOnJS(true)
     .onUpdate((e) => {
+      invalidate();
       zoomScale.value = prevZoomScale.value / e.scale;
     })
     .onEnd(() => {
@@ -71,6 +74,7 @@ export function useCubeGestures() {
       if (!orbitalControlsEnabled) return;
       const dz = calculateZRotationDelta(-e.rotation, prevRotation.value.z);
 
+      invalidate();
       rotation.value = {
         ...rotation.value,
         z: rotation.value.z + dz,
