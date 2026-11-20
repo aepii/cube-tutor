@@ -1,4 +1,3 @@
-import { MODIFIER_QUARTER_TURNS } from "@/features/cube/constants/move.constants";
 import { Move, MoveBase } from "@/features/cube/types/move.types";
 import { rotateQuarter } from "./rotation";
 import { CubeState, MoveSpec } from "./types";
@@ -50,9 +49,16 @@ function applyQuarterTurn(state: CubeState, spec: MoveSpec): CubeState {
   );
 }
 
+// Clockwise quarter turns (0–3) needed to reach the move's resulting *state*.
+// Only the state is reduced modulo 4: R3 and R' end in the same state, but
+// playback still animates the move's literal `turns` (R3 = 270° clockwise).
+export function quarterTurns(move: Move): number {
+  return ((move.turns % 4) + 4) % 4;
+}
+
 export function applyMove(state: CubeState, move: Move): CubeState {
   const spec = MOVE_TABLE[move.base];
-  const turns = MODIFIER_QUARTER_TURNS[move.modifier];
+  const turns = quarterTurns(move);
   let next = state;
   for (let i = 0; i < turns; i++) {
     next = applyQuarterTurn(next, spec);

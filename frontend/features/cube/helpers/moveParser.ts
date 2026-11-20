@@ -1,10 +1,12 @@
 import {
+  MODIFIER_PATTERN,
   VALID_BASES,
-  VALID_MODIFIERS,
 } from "@/features/cube/constants/move.constants";
-import { Move, MoveBase, MoveModifier } from "@/features/cube/types/move.types";
+import { Move, MoveBase } from "@/features/cube/types/move.types";
 
-// Parses one token such as "R", "U'", "r2", "Rw'", "M2'".
+// Parses one token such as "R", "U'", "r2", "Rw'", "M2'", "R3".
+// The amount and direction are kept exactly as written (no normalization),
+// so playback can animate "R2'" as a counter-clockwise half turn.
 export function parseMove(token: string): Move {
   let base = token[0];
   let rest = token.slice(1);
@@ -19,14 +21,18 @@ export function parseMove(token: string): Move {
     throw new Error(`Invalid move: "${token}"`);
   }
 
-  // A half turn has no direction, so "2'" is the same move as "2"
-  const modifier = rest === "2'" ? "2" : rest;
-
-  if (!VALID_MODIFIERS.has(modifier)) {
+  const match = MODIFIER_PATTERN.exec(rest);
+  if (!match) {
     throw new Error(`Invalid move: "${token}"`);
   }
 
-  return { base: base as MoveBase, modifier: modifier as MoveModifier };
+  const count = match[1] === "" ? 1 : Number(match[1]);
+  if (count === 0) {
+    throw new Error(`Invalid move: "${token}"`);
+  }
+  const turns = match[2] ? -count : count;
+
+  return { base: base as MoveBase, turns, notation: token };
 }
 
 // Parses a whole algorithm string, e.g. "(R U R' U') y r2".
