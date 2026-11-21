@@ -6,12 +6,13 @@ migrations match the models, and the history can be walked down and back up.
 """
 
 from alembic import command
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlmodel import SQLModel
 
 from app.core.db import engine
 from tests.conftest import alembic_config
 
+BASELINE = "a92565855791"
 APP_TABLES = {t.name for t in SQLModel.metadata.sorted_tables}
 
 
@@ -35,3 +36,27 @@ def test_downgrade_then_upgrade():
     assert not APP_TABLES & _tables()
     command.upgrade(cfg, "head")
     assert APP_TABLES <= _tables()
+
+
+def test_upgrade_clears_refresh_tokens():
+    # The 4e revision deletes bcrypt-hashed rows, which can't be converted.
+    cfg = alembic_config()
+    command.downgrade(cfg, BASELINE)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO \"user\" (username, email, hashed_password, created_at) "
+                "VALUES ('alice', 'alice@example.com', 'x', now())"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO refreshtoken "
+                "(user_id, hashed_token, expires_at, is_revoked, created_at) "
+                "SELECT id, '$2b$12$bcrypt', now() + interval '1 day', false, now() "
+                "FROM \"user\""
+            )
+        )
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM refreshtoken")).scalar() == 0

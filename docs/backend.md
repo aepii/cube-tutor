@@ -70,7 +70,7 @@ erDiagram
 | Table | Notes |
 |---|---|
 | [`user`](../backend/app/models/user.py) | `username` and `email` unique (max 255) |
-| [`refreshtoken`](../backend/app/models/refresh_token.py) | Stores a **bcrypt hash** of the refresh JWT, never the raw token |
+| [`refreshtoken`](../backend/app/models/refresh_token.py) | Stores the hex **sha256** of the refresh JWT (`hashed_token`, unique index), never the raw token. Looked up by that hash |
 | [`algorithmcase`](../backend/app/models/algorithm_case.py) | One scraped case. `subset` = F2L/OLL/PLL; `setup` = algorithm that creates the case from solved |
 | [`algorithmsolution`](../backend/app/models/algorithm_solution.py) | One solution string per row; `orientation` from the scrape |
 | [`useralgorithm`](../backend/app/models/user_algorithm.py) | Per-user flags. `algorithm_id` points at **`algorithmsolution`**, not the case |
@@ -83,13 +83,14 @@ erDiagram
 Code: [`api/routes/auth.py`](../backend/app/api/routes/auth.py), [`core/security.py`](../backend/app/core/security.py), [`core/dependencies.py`](../backend/app/core/dependencies.py).
 
 - **Passwords:** bcrypt via passlib. Request schemas take `SecretStr`; passwords must be 8–255 characters and usernames at least 3 ([`api/schemas/auth.py`](../backend/app/api/schemas/auth.py)).
-- **Tokens:** HS256 JWTs signed with `SECRET_KEY`. Payload is `{sub: user_id, exp, type}`, where `type` is `"access"` (15 min) or `"refresh"` (7 days). Each decoder rejects the other type.
-- **Register / login** return `{access_token, refresh_token, token_type: "bearer"}`, and store a hashed refresh-token row.
-- **Refresh** (rotation): decode → load the user's non-revoked token rows → `bcrypt.verify` against each until one matches. If the match has expired it is deleted and the request gets a 401. Otherwise it is marked revoked and a new pair is issued.
-- **Logout:** marks the matching refresh row revoked. Returns 200 `"Already logged out"` if the token doesn't decode.
+- **Tokens:** HS256 JWTs signed with `SECRET_KEY`. Payload is `{sub: user_id, exp, type, jti}`, where `type` is `"access"` (15 min) or `"refresh"` (7 days) and `jti` is a random `uuid4().hex`, so every token is unique even when two are minted in the same second. Each decoder rejects the other type.
+- **Refresh-token storage:** the row holds `sha256(token)` as hex. bcrypt isn't used here: the token is an HMAC-signed JWT carrying a random `jti` (uuid4, 122 random bits), so there's no low-entropy secret to brute-force, and a deterministic hash allows one indexed equality lookup. It also covers the whole token, where bcrypt reads only the first 72 bytes. No timing-safe compare is needed, because the database matches on the full hash. Passwords stay on bcrypt.
+- **Register / login** return `{access_token, refresh_token, token_type: "bearer"}`, and store a hashed refresh-token row. Register keeps its SELECT pre-checks for the friendly error. If a concurrent registration wins the race, the `user` unique constraint raises `IntegrityError`; the route rolls back and returns the same 400 (`user_email_key` → "Email already registered", `user_username_key` → "Username already registered").
+- **Refresh** (rotation): decode → look up the row by `sha256(token)` (one query) → reject with 401 unless it belongs to `sub`, isn't revoked and hasn't expired. The row is then marked revoked and a new pair is issued, so a rotated token can't be reused.
+- **Cleanup:** login and a successful refresh delete that user's rows whose `expires_at` has passed, revoked or not. There's no scheduled job yet (Phase 24).
+- **Logout:** looks the row up the same way and marks it revoked. Returns 200 `"Logged out"` whether or not a live row matched, and `"Already logged out"` if the token doesn't decode.
 - **Protected routes** use `get_current_user`. It takes a bearer token (`OAuth2PasswordBearer(tokenUrl="/v1/auth/login")`), decodes the access JWT and loads the `User`. Any failure is a 401.
-- Refresh and logout verify bcrypt against every live token the user has, so cost grows with the number of active sessions. Expired rows are only removed when someone presents that exact expired token.
-- **A rotated refresh token keeps working.** bcrypt reads only the first 72 bytes of its input. For these JWTs that's the header plus `{"sub":"<id>","exp":` and all but the last digit of `exp`, so a user's tokens minted within the same 10-second window hash the same. After a refresh, the old token matches the new row and is accepted. Tokens also have no `jti`, so two minted in the same second are identical strings. Both are pinned by strict-xfail tests in `backend/tests/test_auth.py` (fix: ROADMAP 4e).
+- **Not done yet:** reuse detection (presenting a revoked token doesn't revoke the user's other tokens).
 
 How the app uses this today ([`features/auth/`](../frontend/features/auth/), [`shared/api/client.ts`](../frontend/shared/api/client.ts)):
 
@@ -134,7 +135,7 @@ uv run ruff check .
 - **Isolation from dev data:** [`conftest.py`](../backend/tests/conftest.py) sets `DATABASE_URL` to the test URL *before* importing `app`, so the app's own engine (built at import time in `core/db.py`) points at the test database. It refuses to run if the database name doesn't end in `_test` or equals the dev database's name.
 - **Schema and cleanup:** once per session, `DROP SCHEMA public CASCADE` (which also drops `alembic_version`) then `alembic upgrade head`, so every run builds the DB from the real migrations. After each test, `TRUNCATE … RESTART IDENTITY CASCADE` on every model table. Tests don't depend on order.
 - **Migrations:** [`test_migrations.py`](../backend/tests/test_migrations.py) runs `alembic check` (fails if a model changed without a migration) and walks `downgrade base` → `upgrade head`.
-- **Clock:** an autouse fixture replaces `datetime` in `app.core.security` with a clock that steps one second per `now()` call from a 10-second boundary, so tokens are distinct and the known token bugs (see Auth flow) reproduce deterministically.
+- **Clock:** no global clock fixture; `jti` makes every token unique. Tests that need same-second tokens monkeypatch `datetime` in `app.core.security` with a frozen clock. Auth tests also cover the stored sha256, the single token lookup (counted with a `before_cursor_execute` listener), expired rows, cleanup on login, and the register race (a `get_session` override whose `select(User)` finds nothing).
 - **Config and probes:** [`test_settings.py`](../backend/tests/test_settings.py) (CORS parsing in both forms, `SQL_ECHO` default, Celery URLs), [`test_cors.py`](../backend/tests/test_cors.py) (preflight against an app built with `create_app`), [`test_health.py`](../backend/tests/test_health.py) (503 by overriding the `get_probe_engine` dependency with an engine pointed at an unreachable port). `conftest.py` also sets dummy `CELERY_*` URLs, since they're required.
 - **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
@@ -147,7 +148,9 @@ uv run ruff check .
 Alembic is the only thing that creates or changes tables ([`alembic/env.py`](../backend/alembic/env.py) targets `SQLModel.metadata` and reads `DATABASE_URL` from settings).
 
 - **On startup:** the one-shot Compose `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms` from the backend image. `backend` and `celery` depend on it with `condition: service_completed_successfully`, so if it fails, neither starts and `docker compose up` reports `service "migrate" didn't complete successfully`. Read the error with `docker compose logs migrate`. At head, the upgrade is a no-op and the seed adds nothing. The same command is meant to run as the migration job before each rollout on Azure (ROADMAP §3.11).
-- **History:** one baseline, [`a92565855791_baseline.py`](../backend/alembic/versions/a92565855791_baseline.py), autogenerated from the models: the five tables, the unique `ix_refreshtoken_hashed_token` index, and the `user.username` / `user.email` unique constraints. Foreign keys and unique constraints use Postgres's default names (no naming convention).
+- **History:**
+  1. [`a92565855791_baseline.py`](../backend/alembic/versions/a92565855791_baseline.py), autogenerated from the models: the five tables, the unique `ix_refreshtoken_hashed_token` index, and the `user.username` / `user.email` unique constraints. Foreign keys and unique constraints use Postgres's default names (no naming convention).
+  2. [`ed0be7ac838e_clear_bcrypt_refresh_tokens.py`](../backend/alembic/versions/ed0be7ac838e_clear_bcrypt_refresh_tokens.py) (4e): data only. It deletes every `refreshtoken` row, since bcrypt hashes can't be converted to sha256, so everyone logs in again once. The downgrade does nothing.
 - **Adding a migration:** see [`backend/CLAUDE.md`](../backend/CLAUDE.md#changing-the-schema). The new template ([`script.py.mako`](../backend/alembic/script.py.mako)) produces ruff-clean files.
 
 ### Moving a pre-4b database onto the baseline
