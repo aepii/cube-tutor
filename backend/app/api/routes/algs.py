@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from app.core.db import get_session
-from app.models import AlgorithmSolution, AlgorithmCase, User, UserAlgorithm
+
 from app.api.schemas.algorithm import (
-    SolutionDetail,
-    CaseGroup,
     AlgorithmFavoriteResponse,
     AlgorithmLearnResponse,
+    CaseGroup,
+    SolutionDetail,
 )
+from app.core.db import get_session
 from app.core.dependencies import get_current_user
+from app.models import AlgorithmCase, AlgorithmSolution, User, UserAlgorithm
 
 router = APIRouter(prefix="/v1/algs", tags=["algs"])
 

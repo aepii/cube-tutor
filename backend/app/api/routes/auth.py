@@ -1,24 +1,26 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import Session, select
+
 from app.api.schemas.auth import (
-    RegisterRequest,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
+    RegisterRequest,
     TokenResponse,
 )
 from app.core.db import get_session
-from sqlmodel import Session, select
-from app.models import User, RefreshToken
 from app.core.security import (
-    hash_password,
-    hash_token,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    hash_password,
+    hash_token,
     verify_password,
     verify_token,
 )
+from app.models import RefreshToken, User
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 

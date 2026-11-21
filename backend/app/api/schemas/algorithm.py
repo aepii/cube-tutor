@@ -1,5 +1,5 @@
+
 from pydantic import BaseModel
-from typing import List
 
 
 # Defines the schema for a SolutionDetail
@@ -18,7 +18,7 @@ class CaseGroup(BaseModel):
     subset: str
     subgroup: str
     setup: str
-    solutions: List[SolutionDetail]
+    solutions: list[SolutionDetail]
 
 
 # Defines the schema for a AlgorithmFavoriteResponse

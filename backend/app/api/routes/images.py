@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from shared.tasks import process_image
 
 router = APIRouter(prefix="/v1/images", tags=["scans"])

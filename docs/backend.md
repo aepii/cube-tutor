@@ -74,6 +74,7 @@ Code: [`api/routes/auth.py`](../backend/app/api/routes/auth.py), [`core/security
 - **Logout:** marks the matching refresh row revoked. Returns 200 `"Already logged out"` if the token doesn't decode.
 - **Protected routes** use `get_current_user`. It takes a bearer token (`OAuth2PasswordBearer(tokenUrl="/v1/auth/login")`), decodes the access JWT and loads the `User`. Any failure is a 401.
 - Refresh and logout verify bcrypt against every live token the user has, so cost grows with the number of active sessions. Expired rows are only removed when someone presents that exact expired token.
+- **A rotated refresh token keeps working.** bcrypt reads only the first 72 bytes of its input. For these JWTs that's the header plus `{"sub":"<id>","exp":` and all but the last digit of `exp`, so a user's tokens minted within the same 10-second window hash the same. After a refresh, the old token matches the new row and is accepted. Tokens also have no `jti`, so two minted in the same second are identical strings. Both are pinned by strict-xfail tests in `backend/tests/test_auth.py` (fix: ROADMAP 4e).
 
 How the app uses this today ([`features/auth/`](../frontend/features/auth/), [`shared/api/client.ts`](../frontend/shared/api/client.ts)):
 
@@ -99,6 +100,26 @@ All routers are included in [`main.py`](../backend/app/main.py). This is the com
 - `alg_id` is an **`algorithmsolution.id`**, not a case id.
 - **Open question:** the Swagger "Authorize" button points at `/v1/auth/login`, which expects JSON. Login through the Swagger OAuth2 form (form-encoded) probably fails. I haven't verified this.
 - **Open question:** `/v1/images/upload` is unauthenticated, takes no file, and has no endpoint for checking the task status. It looks like a scaffold for the scan pipeline (see [data-pipeline.md](data-pipeline.md#celery-tasks)).
+
+## Tests
+
+pytest suite in [`backend/tests/`](../backend/tests/), run on the host with `backend/.venv` (`/verify` does this). Config lives in [`backend/pyproject.toml`](../backend/pyproject.toml), and dev tools in [`backend/requirements-dev.txt`](../backend/requirements-dev.txt).
+
+```powershell
+cd backend
+.venv\Scripts\python -m pip install -r requirements-dev.txt
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python -m ruff check .
+```
+
+- **Database:** a real Postgres database, `cubetutor_test`, on the Compose server. The URL is `TEST_DATABASE_URL` if set (CI), otherwise it's built from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST_PORT` in the repo-root `.env` on `localhost`. The database is created if missing. If Postgres is unreachable, the run stops with one error naming the URL.
+- **Isolation from dev data:** [`conftest.py`](../backend/tests/conftest.py) sets `DATABASE_URL` to the test URL *before* importing `app`, so the app's own engine (built at import time in `core/db.py`) points at the test database. It refuses to run if the database name doesn't end in `_test` or equals the dev database's name.
+- **Schema and cleanup:** `drop_all` + `create_all` once per session (4b switches this to Alembic), and `TRUNCATE … RESTART IDENTITY CASCADE` on every table after each test. Tests don't depend on order. `TestClient` is used without entering the lifespan.
+- **Clock:** an autouse fixture replaces `datetime` in `app.core.security` with a clock that steps one second per `now()` call from a 10-second boundary, so tokens are distinct and the known token bugs (see Auth flow) reproduce deterministically.
+- **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
+- **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
+- **Lint:** ruff's default rules plus `I` (import sorting). FastAPI `Depends` and friends are allowed in argument defaults, and `alembic/versions/` is excluded (replaced in 4b).
+- **Not covered:** `/v1/images/upload` (needs Celery/Redis; Phase 24).
 
 ## Migration status
 
