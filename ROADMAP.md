@@ -316,6 +316,8 @@ Everything is built by Claude Code; you orchestrate and review. **[review closel
 
 Phase numbers are IDs, not order. The recommended order is below the diagram.
 
+**Phases are milestones; PRs are smaller.** A phase may ship as several PRs, marked as sub-steps (**4a**, **4b**, …). Each sub-step is one PR, branched from `master` once its prerequisites have merged (never stacked). Split a phase when one part is a prerequisite for another, when parts need different review levels, or when one diff would be too big to review in one sitting. Phases without sub-steps are one PR. Later phases get sub-steps when they come up.
+
 | Phase | Builds on |
 |---|---|
 | 1 Groundwork ✅ · 2 Engine ✅ · 5 Layer turning ✅ | — |
@@ -324,7 +326,7 @@ Phase numbers are IDs, not order. The recommended order is below the diagram.
 | **23 Azure platform** (Bicep, dev + prod, walking skeleton) | 4, 9 |
 | **24 Background jobs on Service Bus** (replaces Celery) | 4, 23 |
 | 3 Nav + auth · 7 Learn UI | independent |
-| 6 Learn ↔ cube | 2, 5 |
+| 6 Learn ↔ cube | 2, 3, 5 |
 | 10 Progress tracking | 4 |
 | 11 Solve timer | 4 |
 | 12 Algorithm drills | 6, 10, 11 |
@@ -340,7 +342,7 @@ Phase numbers are IDs, not order. The recommended order is below the diagram.
 | 21 Race mode | 11, 23, Redis |
 | 22 Cross trainer | 15 |
 
-**Recommended order (architecture first):** **4 → 9 → 23 → 24** → 3 → 6 → 17 → 16 → 10 → 11 → 12 → 13 → 15 → 22 → 14 → 18 → 20 → 8 → 19 → 21, with 7 slotted in whenever.
+**Recommended order (architecture first):** **4 → 9 → 23 → 24** (4a–4f → 9a–9b → 23a–23c → 24a–24c) → 3 (3a, 3b) → 6 → 17 → 16 → 10 → 11 → 12 → 13 → 15 → 22 → 14 → 18 → 20 → 8 → 19 → 21, with 7 slotted in whenever.
 - **Architecture first, as a "walking skeleton":** CI, dev/prod environments on Azure, and the job queue are built and deployed end to end *before* the features that use them, with only trivial functionality at first. Every feature after that lands on a working pipeline and is live in dev on merge. Interviewers value this more than any single feature, and it's the part that's hard to bolt on later.
 - **Then the demo:** 6, 17 and 16 make the app usable and shareable for someone who can't solve a cube.
 - **The solver (13 → 15) moves ahead of uploads** so the job queue gets its first real workload early.
@@ -372,31 +374,52 @@ _Builds on:_ move types + parser (`move.types.ts`, `moveParser.ts`), cube store,
 
 ### Phase 3 — App navigation + auth fixes **[review diff]**
 _Builds on:_ existing auth store, API client, backend `/refresh` + `/logout`. _See §4.1 #2, #3._
+
+Ships as 2 independent PRs (either order).
+
+**3a — Navigation** **[review diff]**
 - [ ] Add `app/(tabs)/_layout.tsx` with a Learn / Playground tab bar
-- [ ] Logout button that calls `POST /v1/auth/logout` and clears both tokens
+- [ ] Fix `app/index.tsx` redirect flicker
+
+**3b — Token refresh + logout** **[review closely: single-flight refresh]**
 - [ ] Store `refresh_token` alongside `access_token` on login / register
 - [ ] 401 interceptor: refresh once (single in-flight refresh shared by concurrent requests), retry the request, sign out only if refresh fails
 - [ ] `checkToken` on startup: if the access token is expired but the refresh token is valid → refresh instead of logging out
+- [ ] Logout button that calls `POST /v1/auth/logout` and clears both tokens
 - [ ] Remove `console.log(newToken)` from `signIn`
-- [ ] Fix `app/index.tsx` redirect flicker
 
 **Done when:** you can stay logged in past 15 minutes, switch tabs, and log out.
 
 ### Phase 4 — Backend hardening **[review diff]** (architecture track, step 1)
 _Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 and §4.2._
-- [ ] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
-- [ ] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`
-- [ ] Catch `IntegrityError` on register → 400
-- [ ] `GET /v1/algs`: `ORDER BY`, optional `?subset=` filter
-- [ ] Replace toggle endpoints with `PUT /v1/algs/{id}/favorite` / `/learn` taking `{ "value": bool }` (shared upsert helper); update the frontend service
+
+Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4e and 4f after 4b** (they change the schema, so they need migrations).
+
+**4a — Test safety net**
+- [ ] pytest suite: auth flow + algs endpoints against a test DB
+- [ ] ruff config, so `/verify` and CI (Phase 9) run it
+
+**4b — Migrations**
 - [ ] Alembic: remove `create_all` from startup, replace both migrations with one baseline, run `alembic upgrade head` on container start
+
+**4c — Packaging**
 - [ ] One Python package + one image for backend and worker (two commands); drop the `shared/` bind-mount dependency
 - [ ] Production-ready Dockerfile: multi-stage, non-root user, no dev dependencies, `uvicorn` settings from env
-- [ ] Health endpoints: `/health/live` (process is up) and `/health/ready` (database reachable), used by Container Apps probes and the deploy smoke test
-- [ ] All config from environment variables (database URL, JWT secret, CORS origins, queue/blob settings), with nothing environment-specific in code
 - [ ] Convert `requirements.txt` files to UTF-8 and trim unused packages (or move to `uv` + `pyproject.toml`)
+
+**4d — Config + health**
+- [ ] All config from environment variables (database URL, JWT secret, CORS origins, queue/blob settings), with nothing environment-specific in code
 - [ ] Settings: CORS origins from env, SQL `echo` off by default, drop deprecated `Field(env=...)`
-- [ ] pytest suite: auth flow + algs endpoints against a test DB
+- [ ] Health endpoints: `/health/live` (process is up) and `/health/ready` (database reachable), used by Container Apps probes and the deploy smoke test
+
+**4e — Auth hardening** (after 4b)
+- [ ] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
+- [ ] Catch `IntegrityError` on register → 400
+
+**4f — Algorithms API** (after 4b)
+- [ ] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`
+- [ ] `GET /v1/algs`: `ORDER BY`, optional `?subset=` filter
+- [ ] Replace toggle endpoints with `PUT /v1/algs/{id}/favorite` / `/learn` taking `{ "value": bool }` (shared upsert helper); update the frontend service
 
 **Done when:** `docker compose up` on an empty DB migrates, seeds, and passes pytest.
 
@@ -442,8 +465,14 @@ _Builds on:_ **Phase 2** (facelet import/export, `applyAlgorithm`), **Phase 4** 
 
 ### Phase 9 — CI/CD + environments **[review closely: workflows]** (architecture track, step 2)
 _Builds on:_ Phase 4 (pytest suite, production Dockerfile). _See §3.11._ The deploy steps go live in Phase 23, once there's Azure to deploy to.
+
+Ships as 2 PRs: 9a, then 9b.
+
+**9a — CI**
 - [ ] `ci.yml` on every PR and push to `master`: frontend (`tsc`, `jest`, `expo lint`, web export), backend (`ruff`, `pytest` with a Postgres service container), Docker builds, Bicep lint; path filters; dependency caching
-- [ ] Branch protection on `master`: PR required, CI must pass, no direct pushes or force-pushes
+- [ ] Branch protection on `master`: PR required, CI must pass, no direct pushes or force-pushes (a repo setting you turn on once 9a's checks exist; not code)
+
+**9b — Images, environments, releases**
 - [ ] GitHub environments `dev` and `production` (`production` requires your approval)
 - [ ] Images built once per commit, pushed to GHCR tagged with the commit SHA; prod reuses the same digest
 - [ ] Deploy workflows (`deploy.yml` reusable; `deploy-dev` on push to `master`; `deploy-prod` on release published), with no Azure steps until Phase 23
@@ -455,36 +484,55 @@ _Builds on:_ Phase 4 (pytest suite, production Dockerfile). _See §3.11._ The de
 
 ### Phase 23 — Azure platform: walking skeleton **[review closely: Bicep, identity]** (architecture track, step 3)
 _Builds on:_ Phase 4 (health endpoints, env config), Phase 9 (workflows, environments). _See §3.9, §3.11, §3.12._
-- [ ] `infra/` Bicep modules: Container Apps environment + `api` app, Postgres server (shared) + per-environment database, Static Web App, storage account, Key Vault, Log Analytics + App Insights, user-assigned managed identity, RBAC role assignments; `dev.bicepparam` / `prod.bicepparam`
+
+Ships as 3 PRs in order: 23a → 23b → 23c.
+
+**23a — Infrastructure (provisioned, nothing deployed)** **[review closely: Bicep, identity]**
 - [ ] **Budget alert ($5) in Bicep**, created before anything else
+- [ ] `infra/` Bicep modules: Container Apps environment + `api` app, Postgres server (shared) + per-environment database, Static Web App, storage account, Key Vault, Log Analytics + App Insights, user-assigned managed identity, RBAC role assignments; `dev.bicepparam` / `prod.bicepparam`
 - [ ] GitHub OIDC: federated credentials per environment; Azure IDs stored as environment variables, not secrets
-- [ ] Migrations as a Container Apps Job (`alembic upgrade head`), run and awaited by the deploy before the new API revision takes traffic
-- [ ] `api`: health probes, scale 0..N on HTTP traffic, secrets from Key Vault via the managed identity, CORS for the Static Web Apps domain
-- [ ] Web build on Static Web Apps (dev + prod); `EXPO_PUBLIC_API_URL` per environment; PR preview environments pointed at the dev API
-- [ ] App Insights basics: the OpenTelemetry distro in the API (requests, dependencies, exceptions)
 - [ ] `infra-whatif.yml` posts the planned infra changes on PRs
 - [ ] One-time bootstrap documented in `infra/README.md` (create resource groups + OIDC identities) — the only manual step
+
+**23b — API deploy**
+- [ ] Migrations as a Container Apps Job (`alembic upgrade head`), run and awaited by the deploy before the new API revision takes traffic
+- [ ] `api`: health probes, scale 0..N on HTTP traffic, secrets from Key Vault via the managed identity, CORS for the Static Web Apps domain
+
+**23c — Web deploy + telemetry** **[review diff]**
+- [ ] Web build on Static Web Apps (dev + prod); `EXPO_PUBLIC_API_URL` per environment; PR preview environments pointed at the dev API
+- [ ] App Insights basics: the OpenTelemetry distro in the API (requests, dependencies, exceptions)
 - [ ] README: architecture diagram, live dev/prod URLs
 
 **Done when:** merging a PR deploys the API and web app to dev with no manual steps; publishing a release (after your approval) deploys the same images to prod; you can log in on both; the budget alert exists.
 
 ### Phase 24 — Background jobs on Service Bus **[review closely]** (architecture track, step 4; replaces Celery)
 _Builds on:_ Phase 4, Phase 23. _See §3.10._
-- [ ] Bicep: Service Bus namespace (Basic) + `jobs` queue (max delivery count, lock duration, dead-lettering) per environment; RBAC: API = Data Sender, worker = Data Receiver
+
+Ships as 3 PRs in order: 24a → 24b → 24c. 24a is the core logic and needs no Azure, so it's reviewed on its own.
+
+**24a — Job model + worker core (in-memory)**
 - [ ] `Job` model + migration; `GET /v1/jobs/{id}` (only the owner can read it)
-- [ ] `JobQueue` interface: `ServiceBusJobQueue` + `InMemoryJobQueue` (tests)
+- [ ] `JobQueue` interface + `InMemoryJobQueue` (tests)
 - [ ] Worker (`python -m app.worker`):
   - peek-lock receive; idempotent on `job_id`; lock renewal
   - complete / abandon (transient) / dead-letter (permanent)
   - stops cleanly on SIGTERM
   - job handlers looked up by `type`
-- [ ] Dead-letter drain marks jobs `failed`; sweeper re-sends stale `pending` jobs
+- [ ] Sweeper re-sends stale `pending` jobs
+- [ ] First job type: `diagnostic.echo` (proves the pipeline). The solver (Phase 15) is the first real workload.
+- [ ] Tests: unit tests with the in-memory queue
+
+**24b — Service Bus locally (emulator)**
+- [ ] `ServiceBusJobQueue` implementation of the `JobQueue` interface
+- [ ] Dead-letter drain marks jobs `failed`
+- [ ] Docker Compose: **Service Bus emulator + Azurite** in; **Celery, Flower and Redis out** (Redis returns when a phase needs it); delete `shared/tasks.py`
+- [ ] Tests: an integration test against the emulator in CI (job round-trip; a poison message ends up dead-lettered and the job `failed`)
+- [ ] Update `CLAUDE.md` (running locally, layout)
+
+**24c — Service Bus on Azure**
+- [ ] Bicep: Service Bus namespace (Basic) + `jobs` queue (max delivery count, lock duration, dead-lettering) per environment; RBAC: API = Data Sender, worker = Data Receiver
 - [ ] `worker` Container App with the KEDA Service Bus scaler (0..N replicas)
 - [ ] Trace context carried in message properties, so the API request and the worker task show up in one App Insights trace
-- [ ] First job type: `diagnostic.echo` (proves the pipeline). The solver (Phase 15) is the first real workload.
-- [ ] Docker Compose: **Service Bus emulator + Azurite** in; **Celery, Flower and Redis out** (Redis returns when a phase needs it); delete `shared/tasks.py`
-- [ ] Tests: unit tests with the in-memory queue; an integration test against the emulator in CI (job round-trip; a poison message ends up dead-lettered and the job `failed`)
-- [ ] Update `CLAUDE.md` (running locally, layout)
 
 **Done when:** a job submitted in dev Azure scales the worker up from 0, completes, and scales back down; a deliberately failing job ends `failed` with its error; the same flow passes against the emulator in CI.
 
