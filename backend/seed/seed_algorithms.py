@@ -1,4 +1,13 @@
+"""Load the scraped algorithms (shared/data/raw/*.json) into Postgres.
+
+Idempotent: rows that already exist are skipped, so it runs on every container
+start (the Compose `migrate` service) and by hand:
+
+    python -m seed.seed_algorithms
+"""
+
 import json
+import os
 from pathlib import Path
 
 from sqlmodel import select
@@ -7,67 +16,82 @@ from app.core.db import db_context
 from app.models.algorithm_case import AlgorithmCase
 from app.models.algorithm_solution import AlgorithmSolution
 
-DATA_DIR = Path("shared/data/raw")
+SUBSETS = ("f2l", "oll", "pll")
 
-# Read raw data
-with open(DATA_DIR / "f2l.json", encoding="utf-8") as f:
-    f2l_data = json.load(f)
+# backend/seed/ → repo root in a checkout; /app/seed/ → / in the image, where the
+# Dockerfile copies the data to /shared/data/raw. Same relative path either way.
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "shared" / "data" / "raw"
 
-with open(DATA_DIR / "oll.json", encoding="utf-8") as f:
-    oll_data = json.load(f)
 
-with open(DATA_DIR / "pll.json", encoding="utf-8") as f:
-    pll_data = json.load(f)
+def data_dir() -> Path:
+    """`SEED_DATA_DIR` if set, else the raw data next to the code."""
+    override = os.environ.get("SEED_DATA_DIR")
+    return Path(override) if override else DEFAULT_DATA_DIR
 
-# Seed the database
-with db_context() as session:
-    for data in [f2l_data, oll_data, pll_data]:
 
-        subset = data["subset"]
-        cases = data["cases"]
+def load_raw(directory: Path) -> list[dict]:
+    datasets = []
+    for name in SUBSETS:
+        with open(directory / f"{name}.json", encoding="utf-8") as f:
+            datasets.append(json.load(f))
+    return datasets
 
-        for case_data in cases:
-            name = case_data["name"]
-            subgroup = case_data["subgroup"]
-            setup = case_data["setup"]
-            solutions = case_data["solutions"]
 
-            # Check if algorithm case already exists
-            statement = select(AlgorithmCase).where(
-                AlgorithmCase.subset == subset,
-                AlgorithmCase.name == name,
-                AlgorithmCase.subgroup == subgroup,
-            )
-            existing_case = session.exec(statement).first()
+def seed(datasets: list[dict]) -> None:
+    with db_context() as session:
+        for data in datasets:
+            subset = data["subset"]
 
-            # Insert case into datacase
-            if existing_case:
-                case = existing_case
-            else:
-                case = AlgorithmCase(
-                    subset=subset, name=name, subgroup=subgroup, setup=setup
-                )
-                session.add(case)
-                session.commit()
-                session.refresh(case)
+            for case_data in data["cases"]:
+                name = case_data["name"]
+                subgroup = case_data["subgroup"]
 
-            for solution_data in solutions:
-                alg_solution = solution_data["alg"]
-                orientation = solution_data["orientation"]
-
-                # Check if algorithm solution already exists
-                statement = select(AlgorithmSolution).where(
-                    AlgorithmSolution.case_id == case.id,
-                    AlgorithmSolution.solution == alg_solution,
-                    AlgorithmSolution.orientation == orientation,
-                )
-                existing_solution = session.exec(statement).first()
-
-                # Insert solution into datacase
-                if not existing_solution:
-                    solution = AlgorithmSolution(
-                        case_id=case.id, orientation=orientation, solution=alg_solution
+                case = session.exec(
+                    select(AlgorithmCase).where(
+                        AlgorithmCase.subset == subset,
+                        AlgorithmCase.name == name,
+                        AlgorithmCase.subgroup == subgroup,
                     )
-                    session.add(solution)
+                ).first()
 
-    session.commit()
+                if case is None:
+                    case = AlgorithmCase(
+                        subset=subset,
+                        name=name,
+                        subgroup=subgroup,
+                        setup=case_data["setup"],
+                    )
+                    session.add(case)
+                    session.commit()  # need case.id for the solutions
+                    session.refresh(case)
+
+                for solution_data in case_data["solutions"]:
+                    alg = solution_data["alg"]
+                    orientation = solution_data["orientation"]
+
+                    existing = session.exec(
+                        select(AlgorithmSolution).where(
+                            AlgorithmSolution.case_id == case.id,
+                            AlgorithmSolution.solution == alg,
+                            AlgorithmSolution.orientation == orientation,
+                        )
+                    ).first()
+
+                    if existing is None:
+                        session.add(
+                            AlgorithmSolution(
+                                case_id=case.id, orientation=orientation, solution=alg
+                            )
+                        )
+
+        session.commit()
+
+
+def main() -> None:
+    directory = data_dir()
+    seed(load_raw(directory))
+    print(f"Seeded algorithms from {directory}", flush=True)
+
+
+if __name__ == "__main__":
+    main()

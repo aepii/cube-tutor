@@ -1,6 +1,6 @@
 # Data pipeline
 
-Algorithm data goes **speedcubedb.com → scraper → `shared/data/raw/*.json` → seed → Postgres**. All steps are run by hand; nothing is scheduled. The Celery worker is a separate, placeholder path.
+Algorithm data goes **speedcubedb.com → scraper → `shared/data/raw/*.json` → seed → Postgres**. Scraping is run by hand. Seeding runs on every `docker compose up` (the `migrate` service). The Celery worker is a separate, placeholder path.
 
 ## Scraper
 
@@ -52,11 +52,10 @@ Files: [`shared/data/raw/f2l.json`](../shared/data/raw/f2l.json), [`oll.json`](.
 
 [`backend/seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py):
 
-```powershell
-docker compose exec backend python -m seed.seed_algorithms
-```
-
-- The script does its work at **import time** (there is no `main()` or `__main__` guard). It reads `shared/data/raw/` relative to the working directory, which is `/backend` in the container, where `shared/` is bind-mounted.
+- **On start:** the Compose `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms`. `backend` and `celery` start only after it exits 0 ([ADR 0005](decisions/0005-one-python-package-uv.md)).
+- **By hand** (e.g. after re-scraping): `docker compose run --rm migrate`, or `docker compose exec backend python -m seed.seed_algorithms`.
+- **Data dir:** `$SEED_DATA_DIR` if set, else `<repo root>/shared/data/raw`, resolved from the script's own path (`Path(__file__).parents[2]`), not the working directory. In the image the code is at `/app` and the Dockerfile copies the data to `/shared/data/raw`, so the same default works on the host and in the container. Tests point `SEED_DATA_DIR` at a temp folder ([`test_seed.py`](../backend/tests/test_seed.py)).
+- `main()` loads `f2l.json`, `oll.json` and `pll.json`, then seeds. Nothing runs at import time.
 - For each subset and case, it looks up `algorithmcase` by `(subset, name, subgroup)` and inserts it if missing (committing per case to get its id). For each solution, it looks up `algorithmsolution` by `(case_id, solution, orientation)` and inserts it if missing. One final commit.
 - **Idempotent:** re-running adds only new rows. It never updates or deletes, so a changed `setup` or a removed solution in the JSON isn't reflected.
 - **Open question:** `orientation` is inserted as the JSON string (`"0"`) into an int column. It works today, presumably through implicit casting by SQLModel/psycopg2/Postgres. I haven't checked which layer does the conversion.
@@ -66,12 +65,10 @@ docker compose exec backend python -m seed.seed_algorithms
 
 | Piece | Code |
 |---|---|
-| Celery app `cube_tutor`: broker `redis://$REDIS_HOST:6379/0`, result backend `.../1`, includes `shared.tasks` | [`shared/celery_app.py`](../shared/celery_app.py) |
-| Worker entry point: imports `celery_app`; Compose runs `celery -A main worker` | [`worker/main.py`](../worker/main.py), [`docker-compose.yml`](../docker-compose.yml) |
-| The only task: `process_image(data: str)` prints its input, sleeps 3 s, returns `"done"` | [`shared/tasks.py`](../shared/tasks.py) |
+| Celery app `cube_tutor`: broker `redis://$REDIS_HOST:6379/0`, result backend `.../1`, includes `app.worker.tasks` | [`backend/app/worker/celery_app.py`](../backend/app/worker/celery_app.py) |
+| Worker: the backend image, run as `celery -A app.worker.celery_app worker --loglevel=info` | [`docker-compose.yml`](../docker-compose.yml) |
+| The only task: `process_image(data: str)` prints its input, sleeps 3 s, returns `"done"` | [`backend/app/worker/tasks.py`](../backend/app/worker/tasks.py) |
 | Producer: `POST /v1/images/upload` calls `process_image.delay("fake data!")` | [`backend/app/api/routes/images.py`](../backend/app/api/routes/images.py) |
 
-- The API and the worker share the task code through the `shared/` bind mount, not a package.
-- The worker image installs only Celery and Redis ([`worker/requirements.txt`](../worker/requirements.txt)), so tasks can't touch the database today.
+- The API and the worker are one package with one dependency set, so tasks can import the models and `app.core.db` ([ADR 0005](decisions/0005-one-python-package-uv.md)).
 - **Open question:** results go to Redis db 1, but nothing reads them and no API endpoint exposes a task's status.
-- **Open question:** the worker image installs `ffmpeg`, `libsm6` and `libxext6` ([`worker/dockerfile`](../worker/dockerfile)), the usual OpenCV system dependencies, but OpenCV isn't in its requirements. These look like preparation for image processing that hasn't been written.

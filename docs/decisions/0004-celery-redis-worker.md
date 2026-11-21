@@ -8,7 +8,7 @@
 The planned feature is photographing a physical cube → detecting its state with OpenCV → solving. Image processing is too slow and heavy for a request/response handler. Today the only producer is `POST /v1/images/upload`, which enqueues a fake `process_image` task.
 
 ## Decision
-A Celery worker in its own container ([`worker/`](../../worker/)) with Redis as broker (db 0) and result backend (db 1). The task code lives in [`shared/`](../../shared/) and is bind-mounted into both the API and worker containers.
+A Celery worker in its own container with Redis as broker (db 0) and result backend (db 1). Originally the task code lived in a repo-root `shared/` folder bind-mounted into separate API and worker containers. Since 4c it lives in [`backend/app/worker/`](../../backend/app/worker/) and the worker runs from the backend image ([0005](0005-one-python-package-uv.md)).
 
 Stated in ROADMAP §5 (plans, not implemented; they carry over to the Service Bus design):
 - Only an id goes through the queue, never the image bytes.
@@ -23,5 +23,5 @@ Stated in ROADMAP §5 (plans, not implemented; they carry over to the Service Bu
 ## Consequences
 - \+ Heavy work stays out of the API and can be retried and scaled separately.
 - − An extra container and dependency (Redis) for what is a placeholder task today.
-- − Code sharing through a bind mount (`./shared → /backend/shared`, `/worker/shared`) instead of an installed package. It works only in Compose, and the worker image has no DB/ORM dependencies.
+- − ~~Code sharing through a bind mount instead of an installed package.~~ Fixed in 4c by [0005](0005-one-python-package-uv.md): one package and one image, so the worker also has the models.
 - − The result backend is configured but nothing reads it, and the API has no status endpoint.

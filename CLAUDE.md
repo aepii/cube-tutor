@@ -33,8 +33,8 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 | `frontend/features/<feature>/` | Feature folders: `components/`, `hooks/`, `helpers/`, `store/`, `types/`, `constants/`, `services/` |
 | `frontend/features/cube/engine/` | Pure-TS cube engine (sticker model). No React/three imports here. |
 | `frontend/tests/` | Jest tests |
-| `backend/` | FastAPI + SQLModel + Alembic + Postgres (auth, algorithms API) |
-| `worker/`, `shared/` | Celery worker + tasks (Redis broker); `shared/data/raw/*.json` = scraped algorithms |
+| `backend/` | One uv package + image: FastAPI + SQLModel + Alembic + Postgres (auth, algorithms API), Celery worker in `app/worker/` (Redis broker), seed |
+| `shared/data/raw/` | Scraped algorithms JSON (seeded into Postgres, read by the frontend engine tests) |
 | `scraper/` | One-off speedcubedb.com scraper that produced the JSON |
 
 ## Docs
@@ -51,13 +51,13 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 - `docs/cube-engine.md`: sticker model, move application, literal turns vs. state. Before touching `features/cube/engine/`, the parser, or the turn queue.
 - `docs/rendering.md`: R3F setup, fiber split, demand frameloop, gestures and turn animation. Before touching cube components, input, or `render/`.
 - `docs/backend.md`: tables, auth flow, endpoint list, migration status. Before touching `backend/` or frontend API/auth code.
-- `docs/data-pipeline.md`: scraper, raw JSON shape, seeding, Celery. Before touching `scraper/`, `shared/`, `worker/`, or the seed.
+- `docs/data-pipeline.md`: scraper, raw JSON shape, seeding, Celery. Before touching `scraper/`, `shared/data/`, `backend/app/worker/`, or the seed.
 - `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, or Celery.
 
 ## Running
 
 ```powershell
-docker compose up -d                 # backend :8000 (/docs), Postgres :5433, Redis, pgAdmin :5050, Celery
+docker compose up -d                 # migrate+seed (one-shot), then backend :8000 (/docs) and Celery; Postgres :5433, Redis, pgAdmin :5050
 cd frontend; npm run web             # http://localhost:8081
 cd frontend; npm start               # Expo Go on a phone (set EXPO_PUBLIC_API_URL in frontend/.env to the PC's LAN IP)
 ```

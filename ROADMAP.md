@@ -35,7 +35,7 @@ Locally everything runs in Docker Compose with Azure's emulators.
 |---|---|---|---|
 | App | Expo (React Native + web), `@react-three/fiber`, Zustand | `frontend/` | Auth + algorithm list work. Stickerless 3D cube drawn from the engine state; free rotation; layer turning by swipe; animated playback. |
 | API | FastAPI + SQLModel + Alembic + Postgres | `backend/` | Auth (register/login/refresh/logout) and favorite/learn endpoints work. Refresh-token storage needs rework (§4). `images.py` is a placeholder. |
-| Worker | Celery + Redis today → **Service Bus consumer** (Phase 24) | `worker/`, `shared/` | Skeleton: one fake `process_image` task that sleeps 3s. |
+| Worker | Celery + Redis today → **Service Bus consumer** (Phase 24) | `backend/app/worker/` | Skeleton: one fake `process_image` task that sleeps 3s. |
 | Infra / CI | none today → GitHub Actions + Bicep (Phases 9, 23) | `.github/`, `infra/` | Nothing yet: no CI, no deployment. |
 | Scraper | requests + BeautifulSoup → speedcubedb.com | `scraper/` | Done. Produced `shared/data/raw/*.json`: F2L 41 cases / 622 solutions, OLL 57 / 228, PLL 21 / 84. |
 
@@ -52,7 +52,7 @@ Everything in §6 builds on these. ✅ = works today.
 - ✅ Seed script loads the scraped JSON into Postgres, safe to re-run — `backend/seed/seed_algorithms.py`
 - ✅ Scraper + data: 119 cases / 934 solutions in `shared/data/raw/*.json`
 - ✅ Docker Compose: backend, Postgres, Redis, pgAdmin, Celery worker
-- ⚠️ Celery: wired end to end, but the only task is a fake (`shared/tasks.py`). **To be replaced by Service Bus (Phase 24).**
+- ⚠️ Celery: wired end to end, but the only task is a fake (`backend/app/worker/tasks.py`). **To be replaced by Service Bus (Phase 24).**
 - ❌ No CI, no deployment, no environments
 
 **Frontend**
@@ -269,7 +269,7 @@ Celery's Azure transports are community-maintained and lag behind its Redis and 
 
 ### 4.2 Refactors
 
-- **Backend + worker:** one Python package, one image, two commands (`uvicorn` / `python -m app.worker`). Removes the `shared/` bind-mount hack and gives the worker access to the SQLModel models it will need for scans.
+- **Backend + worker:** one Python package, one image, three commands (`alembic upgrade head && python -m seed.seed_algorithms` / `uvicorn` / `celery -A app.worker.celery_app worker`). Removes the `shared/` bind-mount hack and gives the worker access to the SQLModel models it will need for scans.
 - **`backend/requirements.txt`, `worker/requirements.txt`, `scraper/requirements.txt` are UTF-16** (PowerShell `pip freeze >`). Convert to UTF-8 and trim: backend has both `psycopg2` and `psycopg2-binary`, plus unused `numpy`, `sentry-sdk`, `fastapi-cloud-cli`, `beautifulsoup4`. Consider `uv` + `pyproject.toml`.
 - **Unused frontend deps:** `react-icons`, `@react-navigation/drawer`, `r3f-native-orbitcontrols`, `@react-three/drei`, `expo-haptics`, `react-native-webview`, `expo-image`. NativeWind is configured but no component uses `className` — pick it or `StyleSheet`, not both. `reset-project` script points at a nonexistent `scripts/` dir.
 - **Favorite/learn endpoints** are near-duplicates and non-idempotent toggles. Replace with `PUT /v1/algs/{id}/favorite` + `{ "value": bool }` (same for learn) sharing one upsert helper.
@@ -405,10 +405,10 @@ Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4
 - [x] Alembic: remove `create_all` from startup, replace both migrations with one baseline, run `alembic upgrade head` on container start
 
 **4c — Packaging**
-- [ ] One Python package + one image for backend and worker (two commands); drop the `shared/` bind-mount dependency
-- [ ] Production-ready Dockerfile: multi-stage, non-root user, no dev dependencies, `uvicorn` settings from env
-- [ ] Convert `requirements.txt` files to UTF-8 and trim unused packages (or move to `uv` + `pyproject.toml`)
-- [ ] Seed on container start, after `alembic upgrade head` (idempotent seed with a `main()` guard, reading the packaged raw data instead of the `shared/` bind mount)
+- [x] One Python package + one image for backend and worker (two commands); drop the `shared/` bind-mount dependency
+- [x] Production-ready Dockerfile: multi-stage, non-root user, no dev dependencies, `uvicorn` settings from env
+- [x] Convert `requirements.txt` files to UTF-8 and trim unused packages (or move to `uv` + `pyproject.toml`)
+- [x] Seed on container start, after `alembic upgrade head` (idempotent seed with a `main()` guard, reading the packaged raw data instead of the `shared/` bind mount)
 
 **4d — Config + health**
 - [ ] All config from environment variables (database URL, JWT secret, CORS origins, queue/blob settings), with nothing environment-specific in code
@@ -528,7 +528,7 @@ Ships as 3 PRs in order: 24a → 24b → 24c. 24a is the core logic and needs no
 **24b — Service Bus locally (emulator)**
 - [ ] `ServiceBusJobQueue` implementation of the `JobQueue` interface
 - [ ] Dead-letter drain marks jobs `failed`
-- [ ] Docker Compose: **Service Bus emulator + Azurite** in; **Celery, Flower and Redis out** (Redis returns when a phase needs it); delete `shared/tasks.py`
+- [ ] Docker Compose: **Service Bus emulator + Azurite** in; **Celery, Flower and Redis out** (Redis returns when a phase needs it); delete `backend/app/worker/`
 - [ ] Tests: an integration test against the emulator in CI (job round-trip; a poison message ends up dead-lettered and the job `failed`)
 - [ ] Update `CLAUDE.md` (running locally, layout)
 
