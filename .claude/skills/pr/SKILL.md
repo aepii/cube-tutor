@@ -39,6 +39,7 @@ Also report these, but you can keep drafting:
 
 ## 2. Gather the evidence
 
+- **Linked issue.** Branches made by `/work` are named `<type>/<issue#>-<slug>`. Take the number from the branch name (or ask the user if there isn't one) and load it with `gh issue view <n> --json number,title,body,comments`. Comments recording a scope change override the body. Check every acceptance criterion against the diff. An AC that isn't met and wasn't changed by agreement (no issue comment recording it) **stops the PR**. Report it instead of drafting.
 - `git diff --stat origin/master...HEAD` (plus uncommitted changes) to list the changed files.
 - Run the `verify` skill (`bash .claude/skills/verify/verify.sh`) unless it already passed on this exact tree in this session. A failure stops the PR.
 - Check the ROADMAP.md §6 phase tags (**[review closely]** / **[review diff]**) and tick the checkboxes this change completes.
@@ -56,11 +57,16 @@ Stop and fix before drafting if a doc is now wrong. "No doc change needed" is al
 
 ## 4. Draft the description
 
-Show the title and body to the user in chat, and write the body to the session scratchpad for `--body-file`. Use exactly these sections:
+Title: the issue title (e.g. `4a: Add pytest suite and ruff config`). Leave out `Closes #` only if the branch has no issue. Show the title and body to the user in chat, and write the body to the session scratchpad for `--body-file`. Use exactly these sections:
 
 ```markdown
+Closes #<issue>
+
 ## Summary
 What changed and why, 2–5 bullets. Briefly explain the key design choices, since the user has to be able to talk about them.
+
+## Acceptance criteria
+The issue's AC as a checklist, each ticked with how it's proven (test name or manual step #). Changed AC: link the issue comment that records the change.
 
 ## How it was verified
 The verify-skill result per step (tsc, jest with test count, lint, web/android export, backend checks or "none configured"), plus any new or changed tests.

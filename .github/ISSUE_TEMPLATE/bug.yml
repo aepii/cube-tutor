@@ -1,0 +1,51 @@
+name: Bug
+description: Something is broken. The fix is one PR via /work.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What's broken, where (paths if known), and how bad it is.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        **Expected:**
+        **Actual:**
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options: [web, android (Expo Go), ios (Expo Go), backend/API, worker]
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] Given the repro above, then <expected behavior>
+        - [ ] A regression test covers it (or why one isn't possible)
+    validations:
+      required: true
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test plan
+      value: |
+        - **Automated:**
+        - **Manual:**
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Logs, suspected cause, related issues.

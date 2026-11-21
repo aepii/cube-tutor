@@ -12,6 +12,19 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 - PRs (branch check, description with close-review vs. skim): `/pr` skill.
 - Explain key design choices briefly; the user needs to be able to talk about them.
 
+## Work items (ROADMAP → issue → PR)
+
+`ROADMAP.md` is the strategy and keeps changing. **GitHub issues are the specs**, written just in time, 1–3 ahead, never a whole phase up front.
+
+1. `/groom <step | idea>`: research, then draft issues (Context, Scope, Out of scope, AC, Test plan, Dependencies). The user approves, then they're created with labels and blocked-by links.
+2. `/work <issue#>`: load the issue + comments + links, branch `<type>/<#>-<slug>` from `master`, plan (user approves), build, `/verify`, hand off a manual test list mapped to the AC. No commit.
+3. The user tests by hand, then `/pr` (`Closes #N`, AC checklist, ROADMAP ticks).
+
+- **Definition of Ready:** the issue has testable AC, a test plan, no open blockers, and no unanswered open questions. Otherwise refine it with `/groom` before `/work`.
+- **Definition of Done:** every AC met or changed by agreement (recorded as an issue comment, with the body edited to match), `/verify` passes, docs updated, ROADMAP §6 ticked, and the user tested it by hand.
+- **Scope changes** go to the issue (comment + body edit), not just chat. Out-of-scope findings become proposed follow-up issues, not drive-by fixes.
+- Labels: type (`enhancement`, `bug`, `chore`, `spike`, `documentation`), `review:closely` / `review:diff`, `area:*`, `phase:N`, `needs:design` (UI work before `docs/ui.md` exists).
+
 ## Layout
 
 | Path | What |
