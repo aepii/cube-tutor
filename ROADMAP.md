@@ -208,11 +208,11 @@ _Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 a
 
 ### Phase 5 — Layer turning **[review closely]** (see the 3D migration plan: rendering + input first, turning after Phase 2)
 _Builds on:_ **Phase 2 engine** (`applyMove`), existing free rotation (`cubeGroupRef` quaternion). _See §3.3, §3.4._
-- [ ] Replace the R3F `onPointerDown` + `orbitalControlsEnabled` flag with one RNGH pan that raycasts on start (hit cubie → turn, miss → orbit)
-- [ ] On drag: transform the screen-space drag vector by the inverse cube quaternion → pick axis, layer, direction → a `Move`
-- [ ] Implement `useCubeTurn`: animate the affected layer (~150–200 ms) in a pivot group, then commit via `applyMove` and rebuild meshes
-- [ ] `isTurning` lock in the store so turns don't overlap
-- [ ] Remove the `console.log` in `Cubie.tsx`; dispose old geometries
+- [x] Replace the R3F `onPointerDown` + `orbitalControlsEnabled` flag with one RNGH pan that raycasts on start (hit cubie → turn, miss → orbit). Built with gesture-handler 3 hooks; pinch, twist, hover and the web wheel are part of the same gesture tree.
+- [x] On drag: project the drag onto the touched face's plane, convert it to cube coordinates with the inverse cube quaternion → axis, layer, direction (`n × u`) → a `Move` (`helpers/screenDrag.ts`, `helpers/turnMath.ts`)
+- [x] Animate the affected layer in a pivot group, then commit via `applyMove` and re-render from state. The layer follows the finger and snaps on release; playback animates the literal turns (`R2'`, `R3`).
+- [x] Busy lock + move queue in the store so turns don't overlap (`activeTurn`, `queue`)
+- [x] Remove the `console.log` in `Cubie.tsx`; dispose old geometries (PR #8)
 
 **Done when:** you can flip the cube upside down, swipe the layer on the right of the screen, and the layer that's visually on the right turns the expected direction.
 

@@ -1,51 +1,57 @@
-import { StyleSheet } from "react-native";
-import { Canvas } from "@/features/cube/three/fiber";
-import { useCubeStore } from "@/features/cube/store/useCubeStore";
-import { colors } from "@/shared/theme/colors";
+import { useRef } from "react";
+import { StyleSheet, View } from "react-native";
+import * as THREE from "three";
 import {
   GestureDetector,
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
-import { useCubeGestures } from "@/features/cube/hooks/useCubeGestures";
+import { Canvas } from "@/features/cube/three/fiber";
+import { colors } from "@/shared/theme/colors";
+import { useCubeInput } from "@/features/cube/hooks/useCubeInput";
+import { SceneHandles } from "@/features/cube/types/input.types";
+import { GESTURE_ZOOM_DEFAULT } from "@/features/cube/constants/camera.constants";
 import Cube from "./Cube";
 import CubeCamera from "./CubeCamera";
 import CubeLighting from "./CubeLighting";
 import DevCubeControls from "./DevCubeControls";
+import SceneBridge from "./SceneBridge";
 
 export default function CubeViewer() {
-  const { setOrbitalControlsEnabled, rotationState, zoomScale, composedGestures } =
-    useCubeGestures();
+  // Shared between the gesture layer (outside the Canvas) and the scene
+  const sceneRef = useRef<SceneHandles | null>(null);
+  const cubeGroupRef = useRef<THREE.Group>(null);
+  const piecesGroupRef = useRef<THREE.Group>(null);
+  const zoomRef = useRef(GESTURE_ZOOM_DEFAULT);
 
-  const cube = useCubeStore((state) => state.cube);
+  const gesture = useCubeInput({ sceneRef, cubeGroupRef, piecesGroupRef, zoomRef });
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <GestureDetector gesture={composedGestures}>
-        <Canvas
-          // Render only when something changes (gestures call invalidate()),
-          // so the GPU idles when the cube is still. Saves battery on mobile.
-          frameloop="demand"
-          dpr={[1, 2]}
-          gl={{ antialias: true }}
-          // No tone mapping, so sticker colors render as defined in the palette
-          flat
-          style={{
-            backgroundColor: colors.primary,
-            // Web only: stop the browser from scrolling/zooming the page
-            // or selecting text while dragging the cube. Ignored on native.
-            touchAction: "none",
-            userSelect: "none",
-          }}
-          onPointerUp={() => setOrbitalControlsEnabled(true)}
-        >
-          <CubeCamera zoomScale={zoomScale} />
-          <CubeLighting />
-          <Cube
-            cube={cube}
-            setOrbitalControlsEnabled={setOrbitalControlsEnabled}
-            rotationState={rotationState}
-          />
-        </Canvas>
+      <GestureDetector gesture={gesture}>
+        {/* Gesture coordinates are relative to this view, which the Canvas fills */}
+        <View style={styles.root}>
+          <Canvas
+            // Render only when something changes (gestures and animations call
+            // invalidate()), so the GPU idles when the cube is still.
+            frameloop="demand"
+            dpr={[1, 2]}
+            gl={{ antialias: true }}
+            // No tone mapping, so face colors render as defined in the palette
+            flat
+            style={{
+              backgroundColor: colors.primary,
+              // Web only: stop the browser from scrolling/zooming the page
+              // or selecting text while dragging the cube. Ignored on native.
+              touchAction: "none",
+              userSelect: "none",
+            }}
+          >
+            <SceneBridge sceneRef={sceneRef} zoomRef={zoomRef} />
+            <CubeCamera zoomRef={zoomRef} />
+            <CubeLighting />
+            <Cube cubeGroupRef={cubeGroupRef} piecesGroupRef={piecesGroupRef} />
+          </Canvas>
+        </View>
       </GestureDetector>
       {__DEV__ && <DevCubeControls />}
     </GestureHandlerRootView>
