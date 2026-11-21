@@ -250,7 +250,7 @@ Celery's Azure transports are community-maintained and lag behind its Redis and 
 2. **No tab bar / no navigation.** `frontend/app/(tabs)/_layout.tsx` doesn't exist, so Learn and Playground can't be navigated between. No logout button anywhere (`signOut()` is only called by the 401 interceptor).
 3. **Forced re-login every 15 minutes.** Access tokens expire in 15 min (`backend/app/core/security.py`); the frontend discards the refresh token (`login.tsx`, `register.tsx` only read `access_token`; `useAuthStore.signIn` stores one token) and the 401 interceptor (`shared/api/client.ts`) signs out instead of refreshing. Logout never calls `/v1/auth/logout`.
 4. **Refresh-token storage is slow and only partially hashed.** `/refresh` and `/logout` load *every* unrevoked token for the user and bcrypt-verify each one (O(n) slow hashes; rows accumulate per login, never cleaned up). bcrypt only reads the first 72 bytes — for a JWT that's the header plus the start of the payload, so the signature is never part of the hash. **Fix:** store `sha256(token)` in the indexed `hashed_token` column and look it up directly; add a cleanup for expired/revoked rows.
-5. **Alembic can't build a fresh DB.** `3d35e0512814_init.py` is empty (`pass`); `e21c1e12ed8e` alters tables no migration creates. It only works because `init_db()` calls `create_all` on startup. **Fix:** remove `create_all`, delete both migrations, autogenerate one baseline, run `alembic upgrade head` on container start.
+5. ✅ _Fixed in 4b (#16)._ **Alembic can't build a fresh DB.** `3d35e0512814_init.py` is empty (`pass`); `e21c1e12ed8e` alters tables no migration creates. It only works because `init_db()` calls `create_all` on startup. **Fix:** remove `create_all`, delete both migrations, autogenerate one baseline, run `alembic upgrade head` on container start.
 6. **Backend image broken without the bind mount.** `backend/dockerfile` builds from `./backend`, so `shared/` is never copied, but `routes/images.py` imports `shared.tasks`. The seed script also depends on cwd-relative `shared/data/raw`.
 7. ✅ _Fixed in `f8a5636`._ **Face-index comment was wrong.** `cube.types.ts` says 2 = Yellow (Down), 3 = White (Top). Actual code: index = three.js `BoxGeometry` face slot = `+X, -X, +Y, -Y, +Z, -Z` = **R, L, U, D, F, B**, and `geometry.ts` colors 2 = White (Up), 3 = Yellow (Down). Every move table depends on this — fix it before writing any.
 8. Smaller:
@@ -402,12 +402,13 @@ Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4
 - [x] ruff config, so `/verify` and CI (Phase 9) run it
 
 **4b — Migrations**
-- [ ] Alembic: remove `create_all` from startup, replace both migrations with one baseline, run `alembic upgrade head` on container start
+- [x] Alembic: remove `create_all` from startup, replace both migrations with one baseline, run `alembic upgrade head` on container start
 
 **4c — Packaging**
 - [ ] One Python package + one image for backend and worker (two commands); drop the `shared/` bind-mount dependency
 - [ ] Production-ready Dockerfile: multi-stage, non-root user, no dev dependencies, `uvicorn` settings from env
 - [ ] Convert `requirements.txt` files to UTF-8 and trim unused packages (or move to `uv` + `pyproject.toml`)
+- [ ] Seed on container start, after `alembic upgrade head` (idempotent seed with a `main()` guard, reading the packaged raw data instead of the `shared/` bind mount)
 
 **4d — Config + health**
 - [ ] All config from environment variables (database URL, JWT secret, CORS origins, queue/blob settings), with nothing environment-specific in code

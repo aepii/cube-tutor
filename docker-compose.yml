@@ -18,7 +18,8 @@ services:
     volumes:
       - ./backend:/backend
       - ./shared/:/backend/shared
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Migrate first; uvicorn only starts if Alembic succeeds.
+    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       postgres:
         condition: service_healthy

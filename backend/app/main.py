@@ -1,23 +1,11 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import algs, auth, images
-from app.core.db import init_db
 
-
-# Startup and shutdown logic of the application
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_db()
-    print("Tables created")
-    yield
-    print("App shutting down")
-
-
-# FastAPI application
-app = FastAPI(title="CubeTutor API", lifespan=lifespan)
+# FastAPI application. The schema is migrated before startup (`alembic upgrade
+# head` in the container command), not by the app.
+app = FastAPI(title="CubeTutor API")
 
 # CORS
 origins = [

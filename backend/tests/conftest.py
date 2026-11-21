@@ -65,6 +65,8 @@ _check_is_test_database(TEST_DATABASE_URL)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["SECRET_KEY"] = TEST_SECRET_KEY
 
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel
 
@@ -102,15 +104,29 @@ def _ensure_database_exists(url: str) -> None:
         admin.dispose()
 
 
+ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
+
+
+def alembic_config() -> Config:
+    """Alembic config for the test DB, independent of the working directory.
+
+    env.py reads the URL from app settings, which already point at the test DB.
+    """
+    return Config(str(ALEMBIC_INI))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _schema():
-    """Fresh schema once per session, built from the SQLModel metadata.
+    """Fresh schema once per session, built by the real migrations.
 
-    (4b replaces this with `alembic upgrade head`.)
+    Dropping the whole `public` schema also drops `alembic_version`, so
+    `upgrade head` always replays the full history from an empty database.
     """
     _ensure_database_exists(TEST_DATABASE_URL)
-    SQLModel.metadata.drop_all(engine)
-    SQLModel.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+    command.upgrade(alembic_config(), "head")
     yield
     engine.dispose()
 
@@ -162,8 +178,6 @@ def _unique_token_times(monkeypatch):
 
 @pytest.fixture
 def client() -> TestClient:
-    # No `with`: the app lifespan (create_all on the configured engine) isn't
-    # needed, since the session fixture already built the schema.
     return TestClient(app)
 
 

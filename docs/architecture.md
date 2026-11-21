@@ -66,4 +66,4 @@ The **Redis/Celery path** is a placeholder. `POST /v1/images/upload` enqueues a 
 
 - **Auth tokens:** the backend issues access + refresh tokens, but the app keeps only the access token. The app signs out on any 401 instead of refreshing. See [backend.md](backend.md#auth-flow).
 - **CORS:** allows `http://localhost:8081` and `:8080` only ([`backend/app/main.py`](../backend/app/main.py)). Native apps aren't subject to CORS.
-- **Schema creation:** `create_all` at API startup, not Alembic. See [backend.md](backend.md#migration-status).
+- **Schema creation:** Alembic only. The backend container runs `alembic upgrade head` before uvicorn; the app never creates tables. See [backend.md](backend.md#migrations).
