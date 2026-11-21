@@ -1,0 +1,61 @@
+name: Feature / chore / spike
+description: One unit of work = one PR. Usually created by Claude's /groom skill; this form keeps hand-written issues in the same shape /work expects.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this exists and what it unblocks. Link the ROADMAP §6 phase/sub-step and any §x.y design notes. Current state in the code, with paths.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Concrete changes, one per line.
+      value: "- "
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Tempting adjacent work that must not happen here, and where it belongs instead.
+      value: "- "
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable by a test or one manual step. Given/When/Then for behavior. 3–8 items; more means split the issue.
+      value: |
+        - [ ] Given …, when …, then …
+        - [ ] Docs: <doc> updated for <what> (or "no doc change: <reason>")
+    validations:
+      required: true
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test plan
+      value: |
+        - **Automated:**
+        - **Manual:**
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      value: |
+        - Blocked by: none
+        - Parent: none
+  - type: textarea
+    id: open-questions
+    attributes:
+      label: Open questions
+      value: "- none"
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Implementation hints, gotchas, relevant ADRs, review level ([review closely] on X / [review diff]).

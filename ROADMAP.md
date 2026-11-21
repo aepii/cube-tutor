@@ -318,6 +318,8 @@ Phase numbers are IDs, not order. The recommended order is below the diagram.
 
 **Phases are milestones; PRs are smaller.** A phase may ship as several PRs, marked as sub-steps (**4a**, **4b**, …). Each sub-step is one PR, branched from `master` once its prerequisites have merged (never stacked). Split a phase when one part is a prerequisite for another, when parts need different review levels, or when one diff would be too big to review in one sitting. Phases without sub-steps are one PR. Later phases get sub-steps when they come up.
 
+**Sub-steps become GitHub issues just in time.** `/groom` turns the next 1–3 sub-steps into issues with acceptance criteria. `/work <#>` implements one. This checklist stays the high-level map, and the issue is the spec (see CLAUDE.md "Work items").
+
 | Phase | Builds on |
 |---|---|
 | 1 Groundwork ✅ · 2 Engine ✅ · 5 Layer turning ✅ | — |
