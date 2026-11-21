@@ -64,6 +64,9 @@ _check_is_test_database(TEST_DATABASE_URL)
 # Must happen before any `app` import (settings + engine are module-level).
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["SECRET_KEY"] = TEST_SECRET_KEY
+# Required by settings; nothing connects to Redis at import time.
+os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
+os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
 
 from alembic import command
 from alembic.config import Config

@@ -1,15 +1,12 @@
 from contextlib import contextmanager
 
-from dotenv import load_dotenv
 from sqlmodel import Session, create_engine
 
 from app import models  # noqa: F401  (registers the tables on SQLModel.metadata)
 from app.core.settings import settings
 
-load_dotenv()
-
 # Initializes the engine object which manages the connection pool
-engine = create_engine(settings.DATABASE_URL, echo=True)
+engine = create_engine(settings.DATABASE_URL, echo=settings.SQL_ECHO)
 
 # Tables are created by Alembic (`alembic upgrade head`), never by the app.
 

@@ -65,7 +65,7 @@ Files: [`shared/data/raw/f2l.json`](../shared/data/raw/f2l.json), [`oll.json`](.
 
 | Piece | Code |
 |---|---|
-| Celery app `cube_tutor`: broker `redis://$REDIS_HOST:6379/0`, result backend `.../1`, includes `app.worker.tasks` | [`backend/app/worker/celery_app.py`](../backend/app/worker/celery_app.py) |
+| Celery app `cube_tutor`: broker `CELERY_BROKER_URL`, result backend `CELERY_RESULT_BACKEND` (Compose: Redis db 0 / 1; see [configuration](backend.md#configuration)), includes `app.worker.tasks` | [`backend/app/worker/celery_app.py`](../backend/app/worker/celery_app.py) |
 | Worker: the backend image, run as `celery -A app.worker.celery_app worker --loglevel=info` | [`docker-compose.yml`](../docker-compose.yml) |
 | The only task: `process_image(data: str)` prints its input, sleeps 3 s, returns `"done"` | [`backend/app/worker/tasks.py`](../backend/app/worker/tasks.py) |
 | Producer: `POST /v1/images/upload` calls `process_image.delay("fake data!")` | [`backend/app/api/routes/images.py`](../backend/app/api/routes/images.py) |
