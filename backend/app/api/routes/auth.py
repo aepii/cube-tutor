@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, delete, select
 
 from app.api.schemas.auth import (
     LoginRequest,
@@ -18,11 +19,50 @@ from app.core.security import (
     hash_password,
     hash_token,
     verify_password,
-    verify_token,
 )
 from app.models import RefreshToken, User
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
+
+# Postgres's default names for the `user` unique constraints (baseline migration)
+_DUPLICATE_DETAIL = {
+    "user_email_key": "Email already registered",
+    "user_username_key": "Username already registered",
+}
+
+
+# Deletes the user's expired refresh-token rows, revoked or not.
+# Runs on login and refresh, so rows can't pile up per user.
+# `expires_at` is a naive UTC timestamp column, so compare with naive UTC (the
+# ORM also evaluates this against rows already loaded in the session).
+def _purge_expired(session: Session, user_id: int) -> None:
+    now = datetime.now(UTC).replace(tzinfo=None)
+    session.exec(
+        delete(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.expires_at < now,
+        )
+    )
+
+
+# Finds the live row for a refresh token with one indexed lookup by hash.
+# Returns None if no row matches, or if it belongs to another user, is revoked
+# or has expired.
+def _find_live_token(
+    session: Session, refresh_token: str, user_id: int
+) -> RefreshToken | None:
+    statement = select(RefreshToken).where(
+        RefreshToken.hashed_token == hash_token(refresh_token)
+    )
+    db_token = session.exec(statement).first()
+    if (
+        db_token is None
+        or db_token.user_id != user_id
+        or db_token.is_revoked
+        or db_token.expires_at.replace(tzinfo=UTC) <= datetime.now(UTC)
+    ):
+        return None
+    return db_token
 
 
 # Endpoint for user registration
@@ -58,9 +98,20 @@ def register(
         hashed_password=hash_password(data.password),
     )
 
-    # Update session
+    # Update session. The pre-checks above give the friendly error in the
+    # common case; the unique constraints catch a concurrent registration.
     session.add(user)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if constraint not in _DUPLICATE_DETAIL:
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_DUPLICATE_DETAIL[constraint],
+        ) from None
     session.refresh(user)
 
     # Create tokens
@@ -97,6 +148,8 @@ def login(
             detail="Invalid username or password",
         )
 
+    _purge_expired(session, user.id)
+
     # Create tokens
     access_token, _ = create_access_token(subject=str(user.id))
     refresh_token, expires_at = create_refresh_token(subject=str(user.id))
@@ -129,19 +182,11 @@ def logout(
         return {"detail": "Already logged out"}
     user_id = int(payload["sub"])
 
-    # Get all user's refresh tokens
-    statement = select(RefreshToken).where(
-        RefreshToken.user_id == user_id,
-        RefreshToken.is_revoked == False,
-    )
-    tokens = session.exec(statement).all()
-
-    for token in tokens:
-        if verify_token(refresh_token, token.hashed_token):
-            token.is_revoked = True
-            break
-
-    session.commit()
+    # Revoke the matching row, if it's still live
+    db_token = _find_live_token(session, refresh_token, user_id)
+    if db_token is not None:
+        db_token.is_revoked = True
+        session.commit()
     return {"detail": "Logged out"}
 
 
@@ -162,35 +207,16 @@ def refresh(
         )
     user_id = int(payload["sub"])
 
-    # Get all user's refresh tokens
-    statement = select(RefreshToken).where(
-        RefreshToken.user_id == user_id,
-        RefreshToken.is_revoked == False,
-    )
-    tokens = session.exec(statement).all()
-
-    # Match hashed token with user's refresh tokens
-    db_token = None
-    for token in tokens:
-        if verify_token(refresh_token, token.hashed_token):
-            db_token = token
-            break
-
-    # No refresh token found
+    # Look up the token's row (one indexed query by hash)
+    db_token = _find_live_token(session, refresh_token, user_id)
     if db_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token not found or revoked",
+            detail="Refresh token not found, revoked or expired",
         )
 
-    # Refresh token expired
-    if db_token.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
-        session.delete(db_token)
-        session.commit()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token expired",
-        )
+    # Clear the user's expired rows (committed with the rotation below)
+    _purge_expired(session, user_id)
 
     # Revoke the token
     db_token.is_revoked = True

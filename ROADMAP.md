@@ -416,8 +416,8 @@ Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4
 - [x] Health endpoints: `/health/live` (process is up) and `/health/ready` (database reachable), used by Container Apps probes and the deploy smoke test
 
 **4e — Auth hardening** (after 4b)
-- [ ] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
-- [ ] Catch `IntegrityError` on register → 400
+- [x] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
+- [x] Catch `IntegrityError` on register → 400
 
 **4f — Algorithms API** (after 4b)
 - [ ] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`

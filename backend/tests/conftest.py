@@ -13,7 +13,6 @@ Test database URL, in order of precedence:
 """
 
 import os
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -73,7 +72,6 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel
 
-from app.core import security
 from app.core.db import engine
 from app.main import app
 from app.models import AlgorithmCase, AlgorithmSolution
@@ -141,42 +139,6 @@ def _clean_tables(_schema):
     tables = ", ".join(f'"{t.name}"' for t in SQLModel.metadata.sorted_tables)
     with engine.begin() as conn:
         conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
-
-
-class _TickingClock(datetime):
-    """`datetime` for app.core.security whose now() steps one second per call.
-
-    JWTs here carry only sub/exp/type, and exp has one-second resolution, so two
-    tokens for the same user minted in the same second are identical strings.
-    Stepping the clock makes every token unique.
-
-    The clock starts on a 10-second boundary so a test's tokens (fewer than ten
-    now() calls) share the same 10-second window. bcrypt only reads the first
-    72 bytes of a JWT, which covers all but the last digit of `exp`, so tokens in
-    one window hash the same. That's the real-world case (refresh a few seconds
-    after login), and it keeps the known-bug xfails in test_auth.py
-    deterministic. Fixes for both: 4e.
-    """
-
-    _start = datetime.now(UTC)
-    _ticks = 0
-
-    @classmethod
-    def reset(cls):
-        now = datetime.now(UTC)
-        cls._start = now - timedelta(seconds=now.second % 10, microseconds=now.microsecond)
-        cls._ticks = 0
-
-    @classmethod
-    def now(cls, tz=None):
-        cls._ticks += 1
-        return (cls._start + timedelta(seconds=cls._ticks)).astimezone(tz)
-
-
-@pytest.fixture(autouse=True)
-def _unique_token_times(monkeypatch):
-    _TickingClock.reset()
-    monkeypatch.setattr(security, "datetime", _TickingClock)
 
 
 @pytest.fixture

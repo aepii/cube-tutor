@@ -1,4 +1,6 @@
+import hashlib
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import jwt
 from passlib.context import CryptContext
@@ -22,14 +24,12 @@ def verify_password(password: SecretStr, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-# Hashes token
+# Hashes a refresh token for storage and lookup.
+# sha256, not bcrypt: the token is a signed JWT with a random jti, so there is
+# nothing to brute-force, and a deterministic hash allows an indexed lookup.
+# It also covers the whole token (bcrypt only reads the first 72 bytes).
 def hash_token(token: str) -> str:
-    return pwd_context.hash(token)
-
-
-# Verifies password against hashed token
-def verify_token(token: str, hashed_token) -> bool:
-    return pwd_context.verify(token, hashed_token)
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 # JWT
@@ -49,7 +49,12 @@ def create_access_token(
         expires_at = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # Payload
-    to_encode = {"sub": subject, "exp": expires_at, "type": "access"}
+    to_encode = {
+        "sub": subject,
+        "exp": expires_at,
+        "type": "access",
+        "jti": uuid4().hex,
+    }
     token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
     # Return JWT and expiration
@@ -81,7 +86,12 @@ def create_refresh_token(
         expires_at = datetime.now(UTC) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
 
     # Payload
-    to_encode = {"sub": subject, "exp": expires_at, "type": "refresh"}
+    to_encode = {
+        "sub": subject,
+        "exp": expires_at,
+        "type": "refresh",
+        "jti": uuid4().hex,  # makes every token (and its hash) unique
+    }
     token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
     # Return JWT and expiration
