@@ -1,0 +1,12 @@
+# Architecture decision records
+
+Short records of significant choices, written **after the fact** from evidence in the code, git history and [`ROADMAP.md`](../../ROADMAP.md). Each one has Context, Decision, Alternatives and Consequences.
+
+**Inferred** marks rationale that isn't stated anywhere in the repo and was reconstructed from the code. Treat it as a hypothesis, not a record.
+
+| # | Decision | Evidence |
+|---|---|---|
+| [0001](0001-expo-single-codebase.md) | Expo + react-native-web for one web/mobile codebase | Project goal stated in `CLAUDE.md`; created with `create-expo-app` |
+| [0002](0002-zustand-state.md) | Zustand for client state | Commit `915c94a` replaced an `AuthProvider` context; rationale not stated |
+| [0003](0003-sticker-model-engine.md) | Sticker-model cube engine instead of face arrays / cubies | ROADMAP §3.1, §3.2 (stated) |
+| [0004](0004-celery-redis-worker.md) | Celery + Redis for background work (planned to be superseded by Service Bus) | Commit `bf3d73c`; ROADMAP §5, §3.10 (stated) |
