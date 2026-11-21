@@ -1,13 +1,11 @@
-import os
-
 from celery import Celery
 
-# Run the worker with: celery -A app.worker.celery_app worker
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+from app.core.settings import settings
 
+# Run the worker with: celery -A app.worker.celery_app worker
 celery_app = Celery(
     "cube_tutor",
-    broker=f"redis://{REDIS_HOST}:6379/0",
-    backend=f"redis://{REDIS_HOST}:6379/1",
+    broker=settings.CELERY_BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND,
     include=["app.worker.tasks"],
 )

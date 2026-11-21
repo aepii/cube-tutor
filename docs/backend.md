@@ -2,7 +2,22 @@
 
 FastAPI app in [`backend/app/`](../backend/app/): `main.py` (app, CORS, routers) · `core/` (settings, DB, security, dependencies) · `models/` (SQLModel tables) · `api/routes/` + `api/schemas/` (endpoints and Pydantic I/O). Interactive docs at http://localhost:8000/docs when Compose is up.
 
-Configuration ([`core/settings.py`](../backend/app/core/settings.py)): `DATABASE_URL` and `SECRET_KEY` are required (from the environment or `.env`). `ENV` and `DEBUG` are defined, but nothing reads them. The engine runs with `echo=True` ([`core/db.py`](../backend/app/core/db.py)), so every SQL statement is logged.
+## Configuration
+
+Every environment-specific value is an env var read by [`core/settings.py`](../backend/app/core/settings.py) (pydantic-settings; a `.env` in the working directory is also read). Required settings have no default, so a missing one stops the process at import. Nothing environment-specific is in code. In Compose, the app containers get these from the repo-root `.env`. [`docker-compose.yml`](../docker-compose.yml) supplies dev fallbacks for the optional ones, and [`.template.env`](../.template.env) lists them all.
+
+| Variable | Default | Read by | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | required | engine ([`core/db.py`](../backend/app/core/db.py)), health probe, Alembic `env.py`, seed | `postgresql://…` (psycopg2) |
+| `SECRET_KEY` | required | [`core/security.py`](../backend/app/core/security.py) | HS256 signing key for JWTs |
+| `CELERY_BROKER_URL` | required | [`worker/celery_app.py`](../backend/app/worker/celery_app.py) | Compose fallback `redis://redis:6379/0` |
+| `CELERY_RESULT_BACKEND` | required | `worker/celery_app.py` | Compose fallback `redis://redis:6379/1` |
+| `CORS_ORIGINS` | `[]` (no browser origins) | [`main.py`](../backend/app/main.py) | Comma-separated (`http://a,http://b`) or a JSON list. Compose fallback `http://localhost:8081,http://localhost:8080` (Expo web) |
+| `SQL_ECHO` | `false` | `core/db.py` | `true` logs every SQL statement |
+
+The Compose-only variables (`POSTGRES_*`, `*_HOST_PORT`, `PGADMIN_*`) configure the containers, not the app. `TEST_DATABASE_URL` is read only by the tests (see [Tests](#tests)).
+
+`main.py` builds the app with `create_app(settings)`; the module-level `app` uses the env settings, and tests can build one with other settings.
 
 ## Data model
 
@@ -95,9 +110,12 @@ All routers are included in [`main.py`](../backend/app/main.py). This is the com
 | GET | `/v1/algs/` | Bearer | → `CaseGroup[]`: `{case_id, case_name, subset, subgroup, setup, solutions: [{solution_id, notation, orientation, is_favorited, is_learned}]}`. One query: solution ⋈ case ⟕ the user's `useralgorithm` | [`algs.py`](../backend/app/api/routes/algs.py) |
 | POST | `/v1/algs/{alg_id}/favorite` | Bearer | → `{algorithm_id, is_favorited}`. **Toggles**; creates the link row on first use. 404 if no such solution | `algs.py` |
 | POST | `/v1/algs/{alg_id}/learn` | Bearer | → `{algorithm_id, is_learned}`. Toggles, same as favorite | `algs.py` |
+| GET | `/health/live` | — | → `{status: "ok"}`. Never touches the DB (liveness) | [`health.py`](../backend/app/api/routes/health.py) |
+| GET | `/health/ready` | — | → 200 `{status: "ok"}` if `SELECT 1` succeeds, else 503 `{status: "unavailable"}` (readiness) | `health.py` |
 | POST | `/v1/images/upload` | — | No body → `{task_id, status: "queued"}`. Enqueues `process_image("fake data!")` | [`images.py`](../backend/app/api/routes/images.py) |
 
 - `alg_id` is an **`algorithmsolution.id`**, not a case id.
+- **Health probes** are unversioned and unauthenticated, for Container Apps probes, the deploy smoke test and the Compose `backend` healthcheck (which calls `/health/ready` with Python's `urllib`, since the slim image has no curl; `docker compose ps` shows `healthy`/`unhealthy`). `ready` uses its own `NullPool` engine with a 2 s connect timeout: every probe opens a fresh connection, a dead DB can't hang it, and it never takes a slot from the app's pool.
 - **Open question:** the Swagger "Authorize" button points at `/v1/auth/login`, which expects JSON. Login through the Swagger OAuth2 form (form-encoded) probably fails. I haven't verified this.
 - **Open question:** `/v1/images/upload` is unauthenticated, takes no file, and has no endpoint for checking the task status. It looks like a scaffold for the scan pipeline (see [data-pipeline.md](data-pipeline.md#celery-tasks)).
 
@@ -117,6 +135,7 @@ uv run ruff check .
 - **Schema and cleanup:** once per session, `DROP SCHEMA public CASCADE` (which also drops `alembic_version`) then `alembic upgrade head`, so every run builds the DB from the real migrations. After each test, `TRUNCATE … RESTART IDENTITY CASCADE` on every model table. Tests don't depend on order.
 - **Migrations:** [`test_migrations.py`](../backend/tests/test_migrations.py) runs `alembic check` (fails if a model changed without a migration) and walks `downgrade base` → `upgrade head`.
 - **Clock:** an autouse fixture replaces `datetime` in `app.core.security` with a clock that steps one second per `now()` call from a 10-second boundary, so tokens are distinct and the known token bugs (see Auth flow) reproduce deterministically.
+- **Config and probes:** [`test_settings.py`](../backend/tests/test_settings.py) (CORS parsing in both forms, `SQL_ECHO` default, Celery URLs), [`test_cors.py`](../backend/tests/test_cors.py) (preflight against an app built with `create_app`), [`test_health.py`](../backend/tests/test_health.py) (503 by overriding the `get_probe_engine` dependency with an engine pointed at an unreachable port). `conftest.py` also sets dummy `CELERY_*` URLs, since they're required.
 - **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
 - **Lint:** ruff's default rules plus `I` (import sorting). FastAPI `Depends` and friends are allowed in argument defaults. Migrations are linted too; `alembic/versions/` only ignores F401, since the template always imports `sqlmodel`, and `alembic` is marked third-party so the local `alembic/` folder doesn't confuse import sorting.

@@ -411,9 +411,9 @@ Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4
 - [x] Seed on container start, after `alembic upgrade head` (idempotent seed with a `main()` guard, reading the packaged raw data instead of the `shared/` bind mount)
 
 **4d — Config + health**
-- [ ] All config from environment variables (database URL, JWT secret, CORS origins, queue/blob settings), with nothing environment-specific in code
-- [ ] Settings: CORS origins from env, SQL `echo` off by default, drop deprecated `Field(env=...)`
-- [ ] Health endpoints: `/health/live` (process is up) and `/health/ready` (database reachable), used by Container Apps probes and the deploy smoke test
+- [x] All config from environment variables (database URL, JWT secret, CORS origins, queue/blob settings), with nothing environment-specific in code (blob settings land with Phase 24, when something reads them)
+- [x] Settings: CORS origins from env, SQL `echo` off by default, drop deprecated `Field(env=...)`
+- [x] Health endpoints: `/health/live` (process is up) and `/health/ready` (database reachable), used by Container Apps probes and the deploy smoke test
 
 **4e — Auth hardening** (after 4b)
 - [ ] Refresh tokens: store `sha256(token)`, look up by indexed hash (no bcrypt loop); clean up expired/revoked rows
