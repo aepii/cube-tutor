@@ -71,12 +71,11 @@ erDiagram
 |---|---|
 | [`user`](../backend/app/models/user.py) | `username` and `email` unique (max 255) |
 | [`refreshtoken`](../backend/app/models/refresh_token.py) | Stores the hex **sha256** of the refresh JWT (`hashed_token`, unique index), never the raw token. Looked up by that hash |
-| [`algorithmcase`](../backend/app/models/algorithm_case.py) | One scraped case. `subset` = F2L/OLL/PLL; `setup` = algorithm that creates the case from solved |
-| [`algorithmsolution`](../backend/app/models/algorithm_solution.py) | One solution string per row; `orientation` from the scrape |
-| [`useralgorithm`](../backend/app/models/user_algorithm.py) | Per-user flags. `algorithm_id` points at **`algorithmsolution`**, not the case |
+| [`algorithmcase`](../backend/app/models/algorithm_case.py) | One scraped case. `subset` = F2L/OLL/PLL; `setup` = algorithm that creates the case from solved. Unique `(subset, name, subgroup)` (`uq_algorithmcase_subset_name_subgroup`) |
+| [`algorithmsolution`](../backend/app/models/algorithm_solution.py) | One solution string per row; `orientation` from the scrape. Unique `(case_id, solution)` (`uq_algorithmsolution_case_solution`) |
+| [`useralgorithm`](../backend/app/models/user_algorithm.py) | Per-user flags. `algorithm_id` points at **`algorithmsolution`**, not the case. Unique `(user_id, algorithm_id)` (`uq_useralgorithm_user_algorithm`): at most one link row per user and solution, which the flag endpoints upsert on |
 
-- **Open question:** `useralgorithm` has no unique constraint on `(user_id, algorithm_id)`. The routes look a row up before inserting, but nothing stops a duplicate from two concurrent requests.
-- **Open question:** `algorithmcase` and `algorithmsolution` have no unique constraints either. The seed's idempotency relies on lookups, not the schema.
+- **Duplicates are ruled out by the schema (4f).** The three unique constraints above are named explicitly in the models (`__table_args__`), so `alembic check` and downgrades stay stable. The seed still checks with lookups first; switching it to `ON CONFLICT DO NOTHING` is a follow-up.
 
 ## Auth flow
 
@@ -108,9 +107,9 @@ All routers are included in [`main.py`](../backend/app/main.py). This is the com
 | POST | `/v1/auth/login` | — | `{username, password}` (JSON, not form data) → `TokenResponse`. 401 on bad credentials | `auth.py` |
 | POST | `/v1/auth/logout` | — (refresh token in body) | `{refresh_token}` → `{detail}` | `auth.py` |
 | POST | `/v1/auth/refresh` | — (refresh token in body) | `{refresh_token}` → `TokenResponse` (rotated). 401 if invalid, revoked or expired | `auth.py` |
-| GET | `/v1/algs/` | Bearer | → `CaseGroup[]`: `{case_id, case_name, subset, subgroup, setup, solutions: [{solution_id, notation, orientation, is_favorited, is_learned}]}`. One query: solution ⋈ case ⟕ the user's `useralgorithm` | [`algs.py`](../backend/app/api/routes/algs.py) |
-| POST | `/v1/algs/{alg_id}/favorite` | Bearer | → `{algorithm_id, is_favorited}`. **Toggles**; creates the link row on first use. 404 if no such solution | `algs.py` |
-| POST | `/v1/algs/{alg_id}/learn` | Bearer | → `{algorithm_id, is_learned}`. Toggles, same as favorite | `algs.py` |
+| GET | `/v1/algs/?subset=` | Bearer | → `CaseGroup[]`: `{case_id, case_name, subset, subgroup, setup, solutions: [{solution_id, notation, orientation, is_favorited, is_learned}]}`. One query: solution ⋈ case ⟕ the user's `useralgorithm`, `ORDER BY subset, case.id, solution.id` (stable between calls). Optional `subset` = `F2L` \| `OLL` \| `PLL` (case-sensitive); anything else → 422 | [`algs.py`](../backend/app/api/routes/algs.py) |
+| PUT | `/v1/algs/{alg_id}/favorite` | Bearer | `{value: bool}` → `{algorithm_id, is_favorited}`. **Sets** the flag (idempotent): one `INSERT … ON CONFLICT (user_id, algorithm_id) DO UPDATE` that creates the link row on first use (the other flag starts false) and otherwise updates only this flag. 404 if no such solution, 422 if `value` is missing or not a JSON boolean | `algs.py` |
+| PUT | `/v1/algs/{alg_id}/learn` | Bearer | `{value: bool}` → `{algorithm_id, is_learned}`. Same as favorite (shared `_set_flag` helper). The old `POST` toggles are gone (405) | `algs.py` |
 | GET | `/health/live` | — | → `{status: "ok"}`. Never touches the DB (liveness) | [`health.py`](../backend/app/api/routes/health.py) |
 | GET | `/health/ready` | — | → 200 `{status: "ok"}` if `SELECT 1` succeeds, else 503 `{status: "unavailable"}` (readiness) | `health.py` |
 | POST | `/v1/images/upload` | — | No body → `{task_id, status: "queued"}`. Enqueues `process_image("fake data!")` | [`images.py`](../backend/app/api/routes/images.py) |
@@ -137,6 +136,7 @@ uv run ruff check .
 - **Migrations:** [`test_migrations.py`](../backend/tests/test_migrations.py) runs `alembic check` (fails if a model changed without a migration) and walks `downgrade base` → `upgrade head`.
 - **Clock:** no global clock fixture; `jti` makes every token unique. Tests that need same-second tokens monkeypatch `datetime` in `app.core.security` with a frozen clock. Auth tests also cover the stored sha256, the single token lookup (counted with a `before_cursor_execute` listener), expired rows, cleanup on login, and the register race (a `get_session` override whose `select(User)` finds nothing).
 - **Config and probes:** [`test_settings.py`](../backend/tests/test_settings.py) (CORS parsing in both forms, `SQL_ECHO` default, Celery URLs), [`test_cors.py`](../backend/tests/test_cors.py) (preflight against an app built with `create_app`), [`test_health.py`](../backend/tests/test_health.py) (503 by overriding the `get_probe_engine` dependency with an engine pointed at an unreachable port). `conftest.py` also sets dummy `CELERY_*` URLs, since they're required.
+- **Algorithms and constraints:** [`test_algs.py`](../backend/tests/test_algs.py) covers ordering (cases inserted out of order), the `subset` filter and its 422, and the PUT flags (set twice → one row, clear, independence, per-user, 404/401/422, old POST → 405). [`test_constraints.py`](../backend/tests/test_constraints.py) inserts a duplicate for each unique key and checks the `IntegrityError` names the expected constraint.
 - **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
 - **Lint:** ruff's default rules plus `I` (import sorting). FastAPI `Depends` and friends are allowed in argument defaults. Migrations are linted too; `alembic/versions/` only ignores F401, since the template always imports `sqlmodel`, and `alembic` is marked third-party so the local `alembic/` folder doesn't confuse import sorting.
@@ -151,6 +151,7 @@ Alembic is the only thing that creates or changes tables ([`alembic/env.py`](../
 - **History:**
   1. [`a92565855791_baseline.py`](../backend/alembic/versions/a92565855791_baseline.py), autogenerated from the models: the five tables, the unique `ix_refreshtoken_hashed_token` index, and the `user.username` / `user.email` unique constraints. Foreign keys and unique constraints use Postgres's default names (no naming convention).
   2. [`ed0be7ac838e_clear_bcrypt_refresh_tokens.py`](../backend/alembic/versions/ed0be7ac838e_clear_bcrypt_refresh_tokens.py) (4e): data only. It deletes every `refreshtoken` row, since bcrypt hashes can't be converted to sha256, so everyone logs in again once. The downgrade does nothing.
+  3. [`3f1c9d2b7a64_unique_constraints.py`](../backend/alembic/versions/3f1c9d2b7a64_unique_constraints.py) (4f): adds the three named unique constraints on `algorithmcase`, `algorithmsolution` and `useralgorithm`. It doesn't dedupe: if duplicates exist, the upgrade fails loudly. The downgrade drops the constraints.
 - **Adding a migration:** see [`backend/CLAUDE.md`](../backend/CLAUDE.md#changing-the-schema). The new template ([`script.py.mako`](../backend/alembic/script.py.mako)) produces ruff-clean files.
 
 ### Moving a pre-4b database onto the baseline

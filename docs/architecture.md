@@ -27,7 +27,7 @@ flowchart LR
     RAW -->|"migrate service<br/>(on every compose up)"| PG[("Postgres<br/>algorithmcase<br/>algorithmsolution")]
     PG -->|"GET /v1/algs/"| API["FastAPI"]
     API -->|"JSON CaseGroup[]"| LEARN["App: Learn screen"]
-    LEARN -->|"POST /v1/algs/{id}/favorite, /learn"| API
+    LEARN -->|"PUT /v1/algs/{id}/favorite, /learn"| API
     API -->|"useralgorithm rows"| PG
     RAW -.->|"read directly by Jest"| TESTS["frontend/tests/engine/<br/>algorithms.test.ts"]
 
@@ -40,7 +40,7 @@ flowchart LR
 1. **Scrape.** [`scraper/main.py`](../scraper/main.py) fetches the F2L, OLL and PLL pages and writes one JSON file per subset into `shared/data/raw/`. See [data-pipeline.md](data-pipeline.md).
 2. **Seed.** [`backend/seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py) loads the three files into the `algorithmcase` and `algorithmsolution` tables. The `migrate` service runs it on every `docker compose up`, after the migrations. It is idempotent.
 3. **Serve.** `GET /v1/algs/` returns every case with its solutions, plus the caller's favorite/learned flags. See [backend.md](backend.md).
-4. **Show.** The Learn screen ([`frontend/app/(tabs)/learn.tsx`](../frontend/app/%28tabs%29/learn.tsx)) lists them. Toggling favorite/learned posts back optimistically ([`SolutionDetail.tsx`](../frontend/features/learn/components/SolutionDetail.tsx)).
+4. **Show.** The Learn screen ([`frontend/app/(tabs)/learn.tsx`](../frontend/app/%28tabs%29/learn.tsx)) lists them. Toggling favorite/learned updates the UI optimistically and sends a `PUT` with the new value (idempotent, so a retry can't flip it back) ([`SolutionDetail.tsx`](../frontend/features/learn/components/SolutionDetail.tsx)).
 5. **Test.** The engine's Jest tests read the same raw JSON directly and check that every scraped solution solves its setup. See [cube-engine.md](cube-engine.md#how-the-tests-pin-the-conventions).
 
 The **3D cube (Playground)** is entirely client-side. It doesn't call the API. See [cube-engine.md](cube-engine.md) and [rendering.md](rendering.md).
