@@ -1,10 +1,16 @@
 # Backend
 
-Backend tables are created on startup by `create_all` (the Alembic history can't build a fresh DB yet; ROADMAP §4.1 #5).
+The schema comes only from Alembic: the backend container runs `alembic upgrade head` before uvicorn. Never call `create_all`. See [docs/backend.md § Migrations](../docs/backend.md#migrations).
 
 ```powershell
 docker compose exec backend python -m seed.seed_algorithms   # seed a fresh DB
 ```
+
+## Changing the schema
+
+1. Edit the model in `app/models/`.
+2. `docker compose exec backend alembic revision --autogenerate -m "<what>"`, then read the generated file in `alembic/versions/` and fix it by hand (autogenerate misses renames, server defaults, data moves). Give new constraints explicit names.
+3. `docker compose exec backend alembic upgrade head`, then run pytest. `tests/test_migrations.py` fails if models and migrations disagree, or if `downgrade` breaks.
 
 ## Tests and lint
 

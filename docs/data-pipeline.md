@@ -60,7 +60,7 @@ docker compose exec backend python -m seed.seed_algorithms
 - For each subset and case, it looks up `algorithmcase` by `(subset, name, subgroup)` and inserts it if missing (committing per case to get its id). For each solution, it looks up `algorithmsolution` by `(case_id, solution, orientation)` and inserts it if missing. One final commit.
 - **Idempotent:** re-running adds only new rows. It never updates or deletes, so a changed `setup` or a removed solution in the JSON isn't reflected.
 - **Open question:** `orientation` is inserted as the JSON string (`"0"`) into an int column. It works today, presumably through implicit casting by SQLModel/psycopg2/Postgres. I haven't checked which layer does the conversion.
-- The tables must already exist. They're created by `create_all` when the API starts ([backend.md](backend.md#migration-status)).
+- The tables must already exist. The backend container creates them with `alembic upgrade head` before the API starts ([backend.md](backend.md#migrations)).
 
 ## Celery tasks
 
