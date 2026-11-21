@@ -37,37 +37,16 @@ step "frontend: expo lint"        "$FE" npx expo lint   # nonzero exit on any er
 step "frontend: export web"       "$FE" npx expo export --platform web --output-dir "$(win_path "$TMP/web")"
 step "frontend: export android"   "$FE" npx expo export --platform android --output-dir "$(win_path "$TMP/android")"
 
-# ---- Python services: only checks that are configured ----
-has_pytest() {
-  [ -f "$1/pytest.ini" ] || [ -f "$1/conftest.py" ] ||
-    grep -qs '^\[tool\.pytest' "$1/pyproject.toml" ||
-    grep -qs '^\[tool:pytest\]' "$1/setup.cfg" ||
-    grep -qs '^\[pytest\]' "$1/tox.ini"
-}
-has_ruff() {
-  [ -f "$1/ruff.toml" ] || [ -f "$1/.ruff.toml" ] || grep -qs '^\[tool\.ruff' "$1/pyproject.toml"
-}
-venv_python() {
-  if [ -x "$1/.venv/Scripts/python.exe" ]; then echo "$1/.venv/Scripts/python.exe"
-  elif [ -x "$1/.venv/bin/python" ]; then echo "$1/.venv/bin/python"
+# ---- Backend (one uv project: API, worker, migrations, seed) ----
+BE="$ROOT/backend"
+if [ -f "$BE/pyproject.toml" ]; then
+  if ! command -v uv >/dev/null 2>&1; then
+    fail "backend: uv sync --locked" "uv is not installed (winget install --id astral-sh.uv)."
   fi
-}
-
-for svc in backend worker; do
-  dir="$ROOT/$svc"
-  [ -d "$dir" ] || continue
-  py="$(venv_python "$dir")"
-  for tool in ruff pytest; do
-    if ! "has_$tool" "$dir"; then
-      skip "$svc: $tool" "no $tool config"
-    elif [ -z "$py" ]; then
-      fail "$svc: $tool" "$tool is configured in $svc/ but there is no $svc/.venv to run it with."
-    elif [ "$tool" = ruff ]; then
-      step "$svc: ruff check" "$dir" "$py" -m ruff check .
-    else
-      step "$svc: pytest" "$dir" "$py" -m pytest -q
-    fi
-  done
-done
+  # --locked fails if uv.lock is out of date with pyproject.toml.
+  step "backend: uv sync --locked"   "$BE" uv sync --locked
+  step "backend: ruff check"         "$BE" uv run --frozen ruff check .
+  step "backend: pytest"             "$BE" uv run --frozen pytest -q
+fi
 
 echo "All checks passed."

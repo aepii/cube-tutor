@@ -1,6 +1,12 @@
-.venv
-__pycache__
-*.pyc
-.git
-.env
-.vscode
+# Build context is the repo root (backend/Dockerfile). Allowlist: send only what
+# the image copies, never frontend/node_modules, .env, venvs or tests.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/alembic.ini
+!backend/alembic
+!backend/app
+!backend/seed
+!shared/data/raw
+**/__pycache__
+**/*.pyc

@@ -9,21 +9,22 @@ How CubeTutor fits together **as the code stands today**. Planned work lives in 
 | App | Expo SDK 58 (React Native 0.88 + react-native-web), expo-router, Zustand, react-three-fiber, axios | [`frontend/`](../frontend/) | `npm run web` (:8081) or Expo Go |
 | API | FastAPI + SQLModel, JWT auth (PyJWT, passlib/bcrypt) | [`backend/app/`](../backend/app/) | `backend` container, uvicorn :8000 |
 | Database | Postgres 18 | — | `postgres` container (host :5433) |
-| Queue | Redis 8.4 (Celery broker on db 0, result backend on db 1) | [`shared/celery_app.py`](../shared/celery_app.py) | `redis` container (host :6380) |
-| Worker | Celery 5.6 | [`worker/main.py`](../worker/main.py), [`shared/tasks.py`](../shared/tasks.py) | `celery` container |
+| Queue | Redis 8.4 (Celery broker on db 0, result backend on db 1) | [`backend/app/worker/celery_app.py`](../backend/app/worker/celery_app.py) | `redis` container (host :6380) |
+| Worker | Celery 5.6 | [`backend/app/worker/tasks.py`](../backend/app/worker/tasks.py) | `celery` container (backend image) |
+| Migrate + seed | Alembic + [`seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py) | [`backend/`](../backend/) | `migrate` container: one-shot, on every `up` |
 | Scraper | requests + BeautifulSoup | [`scraper/`](../scraper/) | Run by hand, once; not in Compose |
 | Admin | pgAdmin 4 | — | `pgadmin` container (:5050) |
 
 Services and ports: [`docker-compose.yml`](../docker-compose.yml), env vars in [`.template.env`](../.template.env).
 
-**`shared/` is bind-mounted** into both Python containers (`./shared → /backend/shared` and `/worker/shared`). That is how the API imports `shared.tasks` and how the seed script finds `shared/data/raw/`. The `backend/shared/` and `worker/shared/` folders in the repo are empty mount points.
+**One image, three commands** ([ADR 0005](decisions/0005-one-python-package-uv.md)). [`backend/Dockerfile`](../backend/Dockerfile) builds one image from the repo root (it copies `shared/data/raw` for the seed). It runs as `migrate` (`alembic upgrade head && python -m seed.seed_algorithms`), `backend` (uvicorn) and `celery` (`celery -A app.worker.celery_app worker`). `backend` and `celery` start only after `migrate` exits 0. The image needs only env vars, no bind mounts. In Compose, `backend` alone also mounts `./backend:/app` and runs uvicorn with `--reload` for development. Dependencies: [`backend/pyproject.toml`](../backend/pyproject.toml) + `uv.lock`.
 
 ## Data flow: scrape → app
 
 ```mermaid
 flowchart LR
     SC["speedcubedb.com"] -->|"scraper/main.py<br/>(manual, one-off)"| RAW["shared/data/raw/<br/>f2l.json · oll.json · pll.json"]
-    RAW -->|"python -m seed.seed_algorithms<br/>(manual)"| PG[("Postgres<br/>algorithmcase<br/>algorithmsolution")]
+    RAW -->|"migrate service<br/>(on every compose up)"| PG[("Postgres<br/>algorithmcase<br/>algorithmsolution")]
     PG -->|"GET /v1/algs/"| API["FastAPI"]
     API -->|"JSON CaseGroup[]"| LEARN["App: Learn screen"]
     LEARN -->|"POST /v1/algs/{id}/favorite, /learn"| API
@@ -37,7 +38,7 @@ flowchart LR
 ```
 
 1. **Scrape.** [`scraper/main.py`](../scraper/main.py) fetches the F2L, OLL and PLL pages and writes one JSON file per subset into `shared/data/raw/`. See [data-pipeline.md](data-pipeline.md).
-2. **Seed.** [`backend/seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py) loads the three files into the `algorithmcase` and `algorithmsolution` tables. It is idempotent.
+2. **Seed.** [`backend/seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py) loads the three files into the `algorithmcase` and `algorithmsolution` tables. The `migrate` service runs it on every `docker compose up`, after the migrations. It is idempotent.
 3. **Serve.** `GET /v1/algs/` returns every case with its solutions, plus the caller's favorite/learned flags. See [backend.md](backend.md).
 4. **Show.** The Learn screen ([`frontend/app/(tabs)/learn.tsx`](../frontend/app/%28tabs%29/learn.tsx)) lists them. Toggling favorite/learned posts back optimistically ([`SolutionDetail.tsx`](../frontend/features/learn/components/SolutionDetail.tsx)).
 5. **Test.** The engine's Jest tests read the same raw JSON directly and check that every scraped solution solves its setup. See [cube-engine.md](cube-engine.md#how-the-tests-pin-the-conventions).

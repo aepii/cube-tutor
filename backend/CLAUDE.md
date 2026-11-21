@@ -1,9 +1,13 @@
 # Backend
 
-The schema comes only from Alembic: the backend container runs `alembic upgrade head` before uvicorn. Never call `create_all`. See [docs/backend.md § Migrations](../docs/backend.md#migrations).
+One uv project for the API (`app/`), the Celery worker (`app/worker/`), migrations and the seed; one image ([`Dockerfile`](Dockerfile), build context = repo root), three Compose commands ([ADR 0005](../docs/decisions/0005-one-python-package-uv.md)).
+
+The schema comes only from Alembic. The one-shot `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms` before `backend` and `celery` start. Never call `create_all`. See [docs/backend.md § Migrations](../docs/backend.md#migrations).
 
 ```powershell
-docker compose exec backend python -m seed.seed_algorithms   # seed a fresh DB
+docker compose run --rm migrate                 # re-run migrations + the (idempotent) seed
+docker compose logs migrate                     # why backend/celery didn't start
+docker compose up -d --build                    # after changing dependencies or worker code (only backend has a live mount)
 ```
 
 ## Changing the schema
@@ -14,14 +18,14 @@ docker compose exec backend python -m seed.seed_algorithms   # seed a fresh DB
 
 ## Tests and lint
 
-Run on the host with `backend/.venv` (that's what `/verify` uses). Tests need Compose Postgres up; they use their own `cubetutor_test` database. See [docs/backend.md § Tests](../docs/backend.md#tests).
+Run on the host with uv (that's what `/verify` uses; install: `winget install --id astral-sh.uv`). Tests need Compose Postgres up; they use their own `cubetutor_test` database. See [docs/backend.md § Tests](../docs/backend.md#tests).
 
 ```powershell
 cd backend
-.venv\Scripts\python -m pip install -r requirements-dev.txt   # once
-.venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m ruff check .          # --fix for import order / pyupgrade
+uv sync                      # once, and after pulling dependency changes
+uv run pytest -q
+uv run ruff check .          # --fix for import order / pyupgrade
 ```
 
-- Add dev-only tools to `requirements-dev.txt` (UTF-8), not `requirements.txt` (UTF-16 until 4c).
+- Dependencies: `uv add <pkg>` (runtime) or `uv add --dev <pkg>` (tests/lint). Commit `uv.lock`. The image installs `--no-dev`, so anything the app imports must be a runtime dependency.
 - Known bugs are pinned with `@pytest.mark.xfail(strict=True, reason="<sub-step>: …")`. A fix makes the test XPASS, which fails the run: remove the marker in the same PR.
