@@ -1,8 +1,10 @@
-from sqlmodel import SQLModel, create_engine, Session
-from dotenv import load_dotenv
 from contextlib import contextmanager
+
+from dotenv import load_dotenv
+from sqlmodel import Session, SQLModel, create_engine
+
+from app import models  # noqa: F401  (registers the tables on SQLModel.metadata)
 from app.core.settings import settings
-from app import models
 
 load_dotenv()
 

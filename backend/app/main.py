@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import algs, auth, images
 from app.core.db import init_db
-from app.api.routes import auth, algs, images
 
 
 # Startup and shutdown logic of the application

@@ -1,6 +1,7 @@
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, UTC
-from sqlmodel import SQLModel, Field, Relationship
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .user import User
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
 
 # Defines the refresh token model for the database layer
 class RefreshToken(SQLModel, table=True):
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None,
         primary_key=True,
     )

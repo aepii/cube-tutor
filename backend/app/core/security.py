@@ -1,9 +1,10 @@
-from datetime import datetime, UTC, timedelta
-from typing import Optional
+from datetime import UTC, datetime, timedelta
+
 import jwt
 from passlib.context import CryptContext
-from app.core.settings import settings
 from pydantic import SecretStr
+
+from app.core.settings import settings
 
 # Defines the hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -39,7 +40,7 @@ REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # Creates a JWT access token
 def create_access_token(
-    subject: str, expires_delta: Optional[timedelta] = None
+    subject: str, expires_delta: timedelta | None = None
 ) -> tuple[str, datetime]:
     # Set expiration
     if expires_delta:
@@ -71,7 +72,7 @@ def decode_access_token(token: str) -> dict | None:
 
 # Creates a JWT refresh token
 def create_refresh_token(
-    subject: str, expires_delta: Optional[timedelta] = None
+    subject: str, expires_delta: timedelta | None = None
 ) -> tuple[str, datetime]:
     # Set expiration
     if expires_delta:

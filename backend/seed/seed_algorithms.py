@@ -1,9 +1,11 @@
-from pathlib import Path
 import json
+from pathlib import Path
+
 from sqlmodel import select
+
 from app.core.db import db_context
-from app.models.algorithm_solution import AlgorithmSolution
 from app.models.algorithm_case import AlgorithmCase
+from app.models.algorithm_solution import AlgorithmSolution
 
 DATA_DIR = Path("shared/data/raw")
 

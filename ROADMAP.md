@@ -398,8 +398,8 @@ _Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 a
 Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4e and 4f after 4b** (they change the schema, so they need migrations).
 
 **4a — Test safety net**
-- [ ] pytest suite: auth flow + algs endpoints against a test DB
-- [ ] ruff config, so `/verify` and CI (Phase 9) run it
+- [x] pytest suite: auth flow + algs endpoints against a test DB
+- [x] ruff config, so `/verify` and CI (Phase 9) run it
 
 **4b — Migrations**
 - [ ] Alembic: remove `create_all` from startup, replace both migrations with one baseline, run `alembic upgrade head` on container start
