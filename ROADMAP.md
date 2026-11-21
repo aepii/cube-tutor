@@ -47,7 +47,7 @@ Everything in §6 builds on these. ✅ = works today.
 
 **Backend**
 - ✅ Auth API: `POST /v1/auth/register`, `/login`, `/refresh`, `/logout`; JWT access (15 min) + refresh (7 days) with rotation and revocation — `backend/app/api/routes/auth.py`
-- ✅ Algorithms API: `GET /v1/algs/` (cases + solutions + the user's favorite/learned flags), `POST /v1/algs/{id}/favorite`, `POST /v1/algs/{id}/learn` — `routes/algs.py`
+- ✅ Algorithms API: `GET /v1/algs/?subset=` (cases + solutions + the user's favorite/learned flags, ordered), idempotent `PUT /v1/algs/{id}/favorite` and `PUT /v1/algs/{id}/learn` taking `{value}` — `routes/algs.py`
 - ✅ Models: `User`, `RefreshToken`, `AlgorithmCase`, `AlgorithmSolution`, `UserAlgorithm` — `backend/app/models/`
 - ✅ Seed script loads the scraped JSON into Postgres, safe to re-run — `backend/seed/seed_algorithms.py`
 - ✅ Scraper + data: 119 cases / 934 solutions in `shared/data/raw/*.json`
@@ -392,7 +392,7 @@ Ships as 2 independent PRs (either order).
 
 **Done when:** you can stay logged in past 15 minutes, switch tabs, and log out.
 
-### Phase 4 — Backend hardening **[review diff]** (architecture track, step 1)
+### Phase 4 — Backend hardening ✅ **[review diff]** (architecture track, step 1)
 _Builds on:_ existing models, auth routes, Docker setup. _See §4.1 #4–6, #8 and §4.2._
 
 Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4e and 4f after 4b** (they change the schema, so they need migrations).
@@ -420,9 +420,9 @@ Ships as 6 PRs: **4a first** (the safety net); then 4b, 4c, 4d in any order; **4
 - [x] Catch `IntegrityError` on register → 400
 
 **4f — Algorithms API** (after 4b)
-- [ ] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`
-- [ ] `GET /v1/algs`: `ORDER BY`, optional `?subset=` filter
-- [ ] Replace toggle endpoints with `PUT /v1/algs/{id}/favorite` / `/learn` taking `{ "value": bool }` (shared upsert helper); update the frontend service
+- [x] Unique constraints: `UserAlgorithm(user_id, algorithm_id)`, `AlgorithmCase(subset, name, subgroup)`, `AlgorithmSolution(case_id, solution)`
+- [x] `GET /v1/algs`: `ORDER BY`, optional `?subset=` filter
+- [x] Replace toggle endpoints with `PUT /v1/algs/{id}/favorite` / `/learn` taking `{ "value": bool }` (shared upsert helper); update the frontend service
 
 **Done when:** `docker compose up` on an empty DB migrates, seeds, and passes pytest.
 

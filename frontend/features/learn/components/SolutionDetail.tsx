@@ -4,8 +4,8 @@ import { FontAwesome, FontAwesome6 } from "@expo/vector-icons";
 import { AlgorithmSolution } from "@/features/learn/types/algorithm.types";
 import { colors } from "@/shared/theme/colors";
 import {
-  favoriteAlgorithm,
-  learnAlgorithm,
+  putFavorite,
+  putLearned,
 } from "@/features/learn/services/alg.service";
 
 export default function SolutionDetail({ item }: { item: AlgorithmSolution }) {
@@ -17,7 +17,7 @@ export default function SolutionDetail({ item }: { item: AlgorithmSolution }) {
     setFavorite(!previousState);
 
     try {
-      await favoriteAlgorithm(item.solution_id);
+      await putFavorite(item.solution_id, !previousState);
     } catch (err: any) {
       console.error(err);
       setFavorite(previousState);
@@ -29,7 +29,7 @@ export default function SolutionDetail({ item }: { item: AlgorithmSolution }) {
     setLearn(!previousState);
 
     try {
-      await learnAlgorithm(item.solution_id);
+      await putLearned(item.solution_id, !previousState);
     } catch (err: any) {
       console.error(err);
       setLearn(previousState);

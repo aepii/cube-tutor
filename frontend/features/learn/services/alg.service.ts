@@ -8,14 +8,15 @@ export const getAlgorithms = async () => {
   return response.data;
 };
 
-// Favorite an algorithm
-export const favoriteAlgorithm = async (alg_id: number) => {
-  const response = await api.post(PREFIX + alg_id + "/favorite");
+// Set an algorithm's favorite flag. PUT with the desired value is idempotent:
+// a retry or a repeated tap can't flip it back.
+export const putFavorite = async (alg_id: number, value: boolean) => {
+  const response = await api.put(PREFIX + alg_id + "/favorite", { value });
   return response.data;
 };
 
-// Learn an algorithm
-export const learnAlgorithm = async (alg_id: number) => {
-  const response = await api.post(PREFIX + alg_id + "/learn");
+// Set an algorithm's learned flag (idempotent, same as putFavorite)
+export const putLearned = async (alg_id: number, value: boolean) => {
+  const response = await api.put(PREFIX + alg_id + "/learn", { value });
   return response.data;
 };

@@ -1,5 +1,5 @@
 
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool
 
 
 # Defines the schema for a SolutionDetail
@@ -31,3 +31,9 @@ class AlgorithmFavoriteResponse(BaseModel):
 class AlgorithmLearnResponse(BaseModel):
     algorithm_id: int
     is_learned: bool
+
+
+# Request body for PUT /v1/algs/{id}/favorite and /learn: the flag's new value.
+# StrictBool: only JSON true/false, not "yes" or 1.
+class FlagUpdate(BaseModel):
+    value: StrictBool
