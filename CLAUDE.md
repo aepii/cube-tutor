@@ -8,7 +8,7 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 
 - The user is an experienced engineer who **orchestrates and reviews**; Claude builds features end to end, including core logic. Don't leave "you write this" stubs.
 - **Never commit, push, or open a PR until the user has tested the change locally and says so.** Finish the work, verify it (`/verify` skill), then stop and list exactly what to test by hand.
-- **One branch and one PR per feature / unit of work, always branched from `master`** (unless the user says otherwise). Don't stack PRs on other feature branches: on this repo, stacked PRs merged into their stale base branches instead of `master` (PRs #2–#5 had to be re-landed). If work truly depends on something unmerged, ask first.
+- **One branch and one PR per feature / unit of work, always branched from `master`** (unless the user says otherwise). A ROADMAP phase can span several PRs; its sub-steps (4a, 4b, …) are the units, each branched from `master` after its prerequisites merge. Don't stack PRs on other feature branches: on this repo, stacked PRs merged into their stale base branches instead of `master` (PRs #2–#5 had to be re-landed). If work truly depends on something unmerged, ask first.
 - PRs (branch check, description with close-review vs. skim): `/pr` skill.
 - Explain key design choices briefly; the user needs to be able to talk about them.
 
