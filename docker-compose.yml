@@ -1,5 +1,5 @@
-# One image (backend/Dockerfile) runs three ways: `migrate` (one-shot: migrations
-# + seed), `backend` (uvicorn) and `celery` (worker). See ADR 0005.
+# One image (backend/Dockerfile) runs two ways: `migrate` (one-shot: migrations
+# + seed) and `backend` (uvicorn). See ADR 0005.
 x-app: &app
   build:
     context: .
@@ -17,11 +17,9 @@ x-app: &app
     # so an older .env without these lines still works.
     CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081,http://localhost:8080}
     SQL_ECHO: ${SQL_ECHO:-false}
-    CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-    CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
 
 services:
-  # Runs once per `up`; backend and celery start only if it exits 0.
+  # Runs once per `up`; backend starts only if it exits 0.
   migrate:
     <<: *app
     container_name: cubetutor_migrate
@@ -53,8 +51,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_started
 
   postgres:
     image: postgres:18
@@ -75,13 +71,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
 
-  redis:
-    image: redis:8.4
-    container_name: cubetutor_redis
-    restart: always
-    ports:
-      - "${REDIS_HOST_PORT}:6379"
-
   pgadmin:
     image: dpage/pgadmin4
     container_name: cubetutor_pgadmin
@@ -95,17 +84,6 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - postgres
-
-  celery:
-    <<: *app
-    container_name: cubetutor_celery
-    restart: always
-    command: celery -A app.worker.celery_app worker --loglevel=info
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_started
 
 volumes:
   postgres_data:

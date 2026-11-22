@@ -43,7 +43,7 @@ Trunk-based ([ADR 0006](docs/decisions/0006-trunk-based-release-tags.md); detail
 | `frontend/features/<feature>/` | Feature folders: `components/`, `hooks/`, `helpers/`, `store/`, `types/`, `constants/`, `services/` |
 | `frontend/features/cube/engine/` | Pure-TS cube engine (sticker model). No React/three imports here. |
 | `frontend/tests/` | Jest tests |
-| `backend/` | One uv package + image: FastAPI + SQLModel + Alembic + Postgres (auth, algorithms API), Celery worker in `app/worker/` (Redis broker), seed |
+| `backend/` | One uv package + image: FastAPI + SQLModel + Alembic + Postgres (auth, algorithms API), migrations, seed |
 | `shared/data/raw/` | Scraped algorithms JSON (seeded into Postgres, read by the frontend engine tests) |
 | `scraper/` | One-off speedcubedb.com scraper that produced the JSON |
 | `infra/` | Bicep for Azure: `bootstrap.bicep` (once, Cloud Shell) and `main.bicep` (per environment, applied by `deploy.yml`) |
@@ -62,15 +62,15 @@ Trunk-based ([ADR 0006](docs/decisions/0006-trunk-based-release-tags.md); detail
 - `docs/cube-engine.md`: sticker model, move application, literal turns vs. state. Before touching `features/cube/engine/`, the parser, or the turn queue.
 - `docs/rendering.md`: R3F setup, fiber split, demand frameloop, gestures and turn animation. Before touching cube components, input, or `render/`.
 - `docs/backend.md`: tables, auth flow, endpoint list, migration status. Before touching `backend/` or frontend API/auth code.
-- `docs/data-pipeline.md`: scraper, raw JSON shape, seeding, Celery. Before touching `scraper/`, `shared/data/`, `backend/app/worker/`, or the seed.
+- `docs/data-pipeline.md`: scraper, raw JSON shape, seeding. Before touching `scraper/`, `shared/data/`, or the seed.
 - `docs/ci-cd.md`: GitHub Actions (CI and the `ci-ok` check, image build, deploy workflows), `master` ruleset, environments, releases and rollback, Dependabot. Before touching `.github/` or cutting a release.
 - `docs/infra.md`: Azure resources per environment, deploy identities and RBAC, naming, region, cost guardrails. Before touching `infra/` or the Azure steps in `deploy.yml` / `infra-whatif.yml` (bootstrap runbook: `infra/README.md`).
-- `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, Celery, the branching/release flow, or the Azure platform (Container Apps, Bicep, OIDC identities).
+- `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, background jobs, the branching/release flow, or the Azure platform (Container Apps, Bicep, OIDC identities).
 
 ## Running
 
 ```powershell
-docker compose up -d                 # migrate+seed (one-shot), then backend :8000 (/docs) and Celery; Postgres :5433, Redis, pgAdmin :5050
+docker compose up -d                 # migrate+seed (one-shot), then backend :8000 (/docs); Postgres :5433, pgAdmin :5050
 cd frontend; npm run web             # http://localhost:8081
 cd frontend; npm start               # Expo Go on a phone (set EXPO_PUBLIC_API_URL in frontend/.env to the PC's LAN IP)
 ```

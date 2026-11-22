@@ -1,6 +1,6 @@
 # Data pipeline
 
-Algorithm data goes **speedcubedb.com → scraper → `shared/data/raw/*.json` → seed → Postgres**. Scraping is run by hand. Seeding runs on every `docker compose up` (the `migrate` service). The Celery worker is a separate, placeholder path.
+Algorithm data goes **speedcubedb.com → scraper → `shared/data/raw/*.json` → seed → Postgres**. Scraping is run by hand. Seeding runs on every `docker compose up` (the `migrate` service).
 
 ## Scraper
 
@@ -52,7 +52,7 @@ Files: [`shared/data/raw/f2l.json`](../shared/data/raw/f2l.json), [`oll.json`](.
 
 [`backend/seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py):
 
-- **On start:** the Compose `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms`. `backend` and `celery` start only after it exits 0 ([ADR 0005](decisions/0005-one-python-package-uv.md)).
+- **On start:** the Compose `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms`. `backend` starts only after it exits 0 ([ADR 0005](decisions/0005-one-python-package-uv.md)).
 - **By hand** (e.g. after re-scraping): `docker compose run --rm migrate`, or `docker compose exec backend python -m seed.seed_algorithms`.
 - **Data dir:** `$SEED_DATA_DIR` if set, else `<repo root>/shared/data/raw`, resolved from the script's own path (`Path(__file__).parents[2]`), not the working directory. In the image the code is at `/app` and the Dockerfile copies the data to `/shared/data/raw`, so the same default works on the host and in the container. Tests point `SEED_DATA_DIR` at a temp folder ([`test_seed.py`](../backend/tests/test_seed.py)).
 - `main()` loads `f2l.json`, `oll.json` and `pll.json`, then seeds. Nothing runs at import time.
@@ -60,15 +60,3 @@ Files: [`shared/data/raw/f2l.json`](../shared/data/raw/f2l.json), [`oll.json`](.
 - **Idempotent:** re-running adds only new rows. It never updates or deletes, so a changed `setup` or a removed solution in the JSON isn't reflected.
 - **Open question:** `orientation` is inserted as the JSON string (`"0"`) into an int column. It works today, presumably through implicit casting by SQLModel/psycopg2/Postgres. I haven't checked which layer does the conversion.
 - The tables must already exist. The backend container creates them with `alembic upgrade head` before the API starts ([backend.md](backend.md#migrations)).
-
-## Celery tasks
-
-| Piece | Code |
-|---|---|
-| Celery app `cube_tutor`: broker `CELERY_BROKER_URL`, result backend `CELERY_RESULT_BACKEND` (Compose: Redis db 0 / 1; see [configuration](backend.md#configuration)), includes `app.worker.tasks` | [`backend/app/worker/celery_app.py`](../backend/app/worker/celery_app.py) |
-| Worker: the backend image, run as `celery -A app.worker.celery_app worker --loglevel=info` | [`docker-compose.yml`](../docker-compose.yml) |
-| The only task: `process_image(data: str)` prints its input, sleeps 3 s, returns `"done"` | [`backend/app/worker/tasks.py`](../backend/app/worker/tasks.py) |
-| Producer: `POST /v1/images/upload` calls `process_image.delay("fake data!")` | [`backend/app/api/routes/images.py`](../backend/app/api/routes/images.py) |
-
-- The API and the worker are one package with one dependency set, so tasks can import the models and `app.core.db` ([ADR 0005](decisions/0005-one-python-package-uv.md)).
-- **Open question:** results go to Redis db 1, but nothing reads them and no API endpoint exposes a task's status.

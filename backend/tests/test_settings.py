@@ -42,10 +42,3 @@ def test_sql_echo_from_env(monkeypatch):
 def test_app_engine_does_not_echo_by_default():
     assert engine.echo is False
 
-
-def test_celery_urls_from_env(monkeypatch):
-    monkeypatch.setenv("CELERY_BROKER_URL", "redis://broker.test:6379/0")
-    monkeypatch.setenv("CELERY_RESULT_BACKEND", "redis://broker.test:6379/1")
-    s = _settings()
-    assert s.CELERY_BROKER_URL == "redis://broker.test:6379/0"
-    assert s.CELERY_RESULT_BACKEND == "redis://broker.test:6379/1"

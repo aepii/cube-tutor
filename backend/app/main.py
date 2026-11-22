@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import algs, auth, health, images
+from app.api.routes import algs, auth, health
 from app.core.settings import Settings, settings
 
 
@@ -21,7 +21,6 @@ def create_app(s: Settings) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(algs.router)
-    app.include_router(images.router)
     return app
 
 

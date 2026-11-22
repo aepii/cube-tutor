@@ -34,8 +34,8 @@ Locally everything runs in Docker Compose with Azure's emulators.
 | Part | Stack | Location | State |
 |---|---|---|---|
 | App | Expo (React Native + web), `@react-three/fiber`, Zustand | `frontend/` | Auth + algorithm list work. Stickerless 3D cube drawn from the engine state; free rotation; layer turning by swipe; animated playback. |
-| API | FastAPI + SQLModel + Alembic + Postgres | `backend/` | Auth (register/login/refresh/logout) and favorite/learn endpoints work. Refresh-token storage needs rework (§4). `images.py` is a placeholder. |
-| Worker | Celery + Redis today → **Service Bus consumer** (Phase 24) | `backend/app/worker/` | Skeleton: one fake `process_image` task that sleeps 3s. |
+| API | FastAPI + SQLModel + Alembic + Postgres | `backend/` | Auth (register/login/refresh/logout) and favorite/learn endpoints work. Refresh-token storage needs rework (§4). |
+| Worker | none today (Celery + Redis removed in #39) → **Service Bus consumer** (Phase 24) | — | Nothing yet. |
 | Infra / CI | none today → GitHub Actions + Bicep (Phases 9, 23) | `.github/`, `infra/` | Nothing yet: no CI, no deployment. |
 | Scraper | requests + BeautifulSoup → speedcubedb.com | `scraper/` | Done. Produced `shared/data/raw/*.json`: F2L 41 cases / 622 solutions, OLL 57 / 228, PLL 21 / 84. |
 
@@ -51,8 +51,8 @@ Everything in §6 builds on these. ✅ = works today.
 - ✅ Models: `User`, `RefreshToken`, `AlgorithmCase`, `AlgorithmSolution`, `UserAlgorithm` — `backend/app/models/`
 - ✅ Seed script loads the scraped JSON into Postgres, safe to re-run — `backend/seed/seed_algorithms.py`
 - ✅ Scraper + data: 119 cases / 934 solutions in `shared/data/raw/*.json`
-- ✅ Docker Compose: backend, Postgres, Redis, pgAdmin, Celery worker
-- ⚠️ Celery: wired end to end, but the only task is a fake (`backend/app/worker/tasks.py`). **To be replaced by Service Bus (Phase 24).**
+- ✅ Docker Compose: migrate (one-shot), backend, Postgres, pgAdmin
+- ⚠️ No background jobs: the placeholder Celery + Redis path was removed in #39. **Service Bus replaces it (Phase 24).**
 - ❌ No CI, no deployment, no environments
 
 **Frontend**
@@ -530,7 +530,7 @@ Ships as 3 PRs in order: 24a → 24b → 24c. 24a is the core logic and needs no
 **24b — Service Bus locally (emulator)**
 - [ ] `ServiceBusJobQueue` implementation of the `JobQueue` interface
 - [ ] Dead-letter drain marks jobs `failed`
-- [ ] Docker Compose: **Service Bus emulator + Azurite** in; **Celery, Flower and Redis out** (Redis returns when a phase needs it); delete `backend/app/worker/`
+- [ ] Docker Compose: **Service Bus emulator + Azurite** in (Celery and Redis were already removed in #39; Redis returns when a phase needs it)
 - [ ] Tests: an integration test against the emulator in CI (job round-trip; a poison message ends up dead-lettered and the job `failed`)
 - [ ] Update `CLAUDE.md` (running locally, layout)
 

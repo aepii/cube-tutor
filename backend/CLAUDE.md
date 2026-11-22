@@ -1,13 +1,13 @@
 # Backend
 
-One uv project for the API (`app/`), the Celery worker (`app/worker/`), migrations and the seed; one image ([`Dockerfile`](Dockerfile), build context = repo root), three Compose commands ([ADR 0005](../docs/decisions/0005-one-python-package-uv.md)).
+One uv project for the API (`app/`), migrations and the seed; one image ([`Dockerfile`](Dockerfile), build context = repo root), two Compose commands ([ADR 0005](../docs/decisions/0005-one-python-package-uv.md)).
 
-The schema comes only from Alembic. The one-shot `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms` before `backend` and `celery` start. Never call `create_all`. See [docs/backend.md § Migrations](../docs/backend.md#migrations).
+The schema comes only from Alembic. The one-shot `migrate` service runs `alembic upgrade head && python -m seed.seed_algorithms` before `backend` starts. Never call `create_all`. See [docs/backend.md § Migrations](../docs/backend.md#migrations).
 
 ```powershell
 docker compose run --rm migrate                 # re-run migrations + the (idempotent) seed
-docker compose logs migrate                     # why backend/celery didn't start
-docker compose up -d --build                    # after changing dependencies or worker code (only backend has a live mount)
+docker compose logs migrate                     # why backend didn't start
+docker compose up -d --build                    # after changing dependencies or the Dockerfile
 ```
 
 ## Changing the schema
