@@ -1,0 +1,52 @@
+# Reusable deploy of one image digest to one GitHub environment.
+# Called by deploy-dev.yml (dev) and deploy-prod.yml (production; the
+# environment's required reviewer approves before this job starts).
+# Phase 23 replaces the placeholder step with the Azure deploy.
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment (dev | production)
+        required: true
+        type: string
+      image:
+        description: Image by digest, e.g. ghcr.io/owner/cubetutor-backend@sha256:...
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: check the image is pinned by digest
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          # Tags can be moved; only a digest guarantees we deploy what was tested.
+          if [[ ! "$IMAGE" =~ ^[a-z0-9./_-]+@sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::image must be <repo>@sha256:<digest>, got '$IMAGE'"
+            exit 1
+          fi
+      - name: deploy (placeholder until Phase 23)
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE: ${{ inputs.image }}
+        run: |
+          # Phase 23: Azure OIDC login, Bicep deploy, migration job
+          # (alembic upgrade head) and wait, point Container Apps at $IMAGE,
+          # smoke-test /health/ready.
+          echo "Deploying $IMAGE to $ENVIRONMENT"
+          {
+            echo "### Deploy to \`$ENVIRONMENT\`"
+            echo
+            echo "Image: \`$IMAGE\`"
+            echo
+            echo "_No Azure steps yet (Phase 23)._"
+          } >> "$GITHUB_STEP_SUMMARY"

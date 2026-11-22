@@ -1,0 +1,95 @@
+# Publishing a GitHub Release (tag v*) promotes the image that was built for
+# the tagged commit by deploy-dev.yml. Nothing is rebuilt: the same digest that
+# ran in dev goes to production. See docs/ci-cd.md and ADR 0006.
+#   resolve (read-only)  ->  deploy (production: waits for approval)  ->  tag :vX.Y.Z
+# Rollback: re-run this workflow's run for the earlier release.
+name: Deploy production
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # Explicit `bash` = `bash -eo pipefail`; the implicit default has no pipefail,
+    # which would hide a failed `imagetools inspect` behind `| jq`.
+    shell: bash
+
+jobs:
+  resolve:
+    name: resolve image digest
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read # works whether or not the package is public yet
+    outputs:
+      repo: ${{ steps.digest.outputs.repo }}
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: find the image for the tagged commit
+        id: digest
+        # For a release event GITHUB_SHA is the commit the tag points at.
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/cubetutor-backend"
+          # `{{.Manifest.Digest}}` is not safe: buildx prints its human-readable
+          # view for any template on .Manifest. JSON + jq gives just the digest.
+          if ! digest=$(docker buildx imagetools inspect "$repo:$GITHUB_SHA" --format '{{json .Manifest}}' | jq -re .digest); then
+            echo "::error::No image $repo:$GITHUB_SHA. Only commits on master that deploy-dev built can be released."
+            exit 1
+          fi
+          echo "repo=$repo" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Release $VERSION = $repo:$GITHUB_SHA = $digest" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy
+    needs: resolve
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      image: ${{ needs.resolve.outputs.repo }}@${{ needs.resolve.outputs.digest }}
+
+  tag:
+    name: tag image with the release version
+    needs: [resolve, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: add the version tag to the same digest
+        env:
+          REPO: ${{ needs.resolve.outputs.repo }}
+          DIGEST: ${{ needs.resolve.outputs.digest }}
+          VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          docker buildx imagetools create --tag "$REPO:$VERSION" "$REPO@$DIGEST"
+          # Prove the tag points at the deployed digest (no new manifest).
+          tagged=$(docker buildx imagetools inspect "$REPO:$VERSION" --format '{{json .Manifest}}' | jq -re .digest)
+          if [ "$tagged" != "$DIGEST" ]; then
+            echo "::error::$REPO:$VERSION is $tagged, expected $DIGEST"
+            exit 1
+          fi
+          echo "$REPO:$VERSION -> $DIGEST" >> "$GITHUB_STEP_SUMMARY"

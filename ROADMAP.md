@@ -477,12 +477,12 @@ Ships as 2 PRs: 9a, then 9b.
 - [x] Branch cleanup: head branches deleted when a PR is merged (repo setting) or closed without merging (`cleanup-branch.yml`)
 
 **9b — Images, environments, releases**
-- [ ] GitHub environments `dev` and `production` (`production` requires your approval)
-- [ ] Images built once per commit, pushed to GHCR tagged with the commit SHA; prod reuses the same digest
-- [ ] Deploy workflows (`deploy.yml` reusable; `deploy-dev` on push to `master`; `deploy-prod` on release published), with no Azure steps until Phase 23
-- [ ] Release process: `v*` tags, generated release notes, rollback = redeploy the previous tag
-- [ ] Dependabot (npm, uv, GitHub Actions, Docker); minimal `README.md` with a CI status badge
-- [ ] Update `CLAUDE.md`: branching/release flow, how to cut a release; ADR 0006 (trunk-based + release tags, promote by digest)
+- [x] GitHub environments `dev` and `production` (`production` requires your approval)
+- [x] Images built once per commit, pushed to GHCR tagged with the commit SHA; prod reuses the same digest
+- [x] Deploy workflows (`deploy.yml` reusable; `deploy-dev` on push to `master`; `deploy-prod` on release published), with no Azure steps until Phase 23
+- [x] Release process: `v*` tags, generated release notes, rollback = redeploy the previous tag
+- [x] Dependabot (npm, uv, GitHub Actions, Docker); minimal `README.md` with a CI status badge
+- [x] Update `CLAUDE.md`: branching/release flow, how to cut a release; ADR 0006 (trunk-based + release tags, promote by digest)
 
 **Done when:** a PR shows green CI checks, merging is blocked when they fail, and every merge to `master` produces images in GHCR.
 
