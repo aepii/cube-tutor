@@ -46,6 +46,7 @@ Trunk-based ([ADR 0006](docs/decisions/0006-trunk-based-release-tags.md); detail
 | `backend/` | One uv package + image: FastAPI + SQLModel + Alembic + Postgres (auth, algorithms API), Celery worker in `app/worker/` (Redis broker), seed |
 | `shared/data/raw/` | Scraped algorithms JSON (seeded into Postgres, read by the frontend engine tests) |
 | `scraper/` | One-off speedcubedb.com scraper that produced the JSON |
+| `infra/` | Bicep for Azure: `bootstrap.bicep` (once, Cloud Shell) and `main.bicep` (per environment, applied by `deploy.yml`) |
 
 ## Docs
 
@@ -63,7 +64,8 @@ Trunk-based ([ADR 0006](docs/decisions/0006-trunk-based-release-tags.md); detail
 - `docs/backend.md`: tables, auth flow, endpoint list, migration status. Before touching `backend/` or frontend API/auth code.
 - `docs/data-pipeline.md`: scraper, raw JSON shape, seeding, Celery. Before touching `scraper/`, `shared/data/`, `backend/app/worker/`, or the seed.
 - `docs/ci-cd.md`: GitHub Actions (CI and the `ci-ok` check, image build, deploy workflows), `master` ruleset, environments, releases and rollback, Dependabot. Before touching `.github/` or cutting a release.
-- `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, Celery, or the branching/release flow.
+- `docs/infra.md`: Azure resources per environment, deploy identities and RBAC, naming, region, cost guardrails. Before touching `infra/` or the Azure steps in `deploy.yml` / `infra-whatif.yml` (bootstrap runbook: `infra/README.md`).
+- `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, Celery, the branching/release flow, or the Azure platform (Container Apps, Bicep, OIDC identities).
 
 ## Running
 

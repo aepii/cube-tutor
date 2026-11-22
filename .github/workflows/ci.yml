@@ -25,6 +25,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
       docker: ${{ steps.filter.outputs.docker }}
+      infra: ${{ steps.filter.outputs.infra }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -46,6 +47,9 @@ jobs:
               - '.dockerignore'
               - 'backend/**'
               - 'shared/data/**'
+            infra:
+              - '.github/workflows/ci.yml'
+              - 'infra/**'
 
   frontend:
     name: frontend
@@ -130,11 +134,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Bicep build + lint of every file under infra/ (infra/lint.sh). Any warning
+  # fails. No Azure login: the what-if preview is infra-whatif.yml.
+  infra:
+    name: infra
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install bicep
+        # Pinned; deploy.yml installs the same version.
+        run: az bicep install --version v0.49.2
+      - name: bicep build + lint (warnings are errors)
+        run: BICEP="$HOME/.azure/bin/bicep" bash infra/lint.sh
+
   # The single required check (.github/rulesets/master.json). Skipped jobs pass;
   # failed or cancelled ones fail it.
   ci-ok:
     name: ci-ok
-    needs: [changes, frontend, backend, docker]
+    needs: [changes, frontend, backend, docker, infra]
     if: always()
     runs-on: ubuntu-latest
     steps:

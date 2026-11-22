@@ -3,8 +3,9 @@
 GitHub Actions workflows live in [`.github/workflows/`](../.github/workflows/). Design and the full target pipeline: ROADMAP §3.11 and [ADR 0006](decisions/0006-trunk-based-release-tags.md). This doc covers what exists today:
 - the CI gate, `master` protection and branch cleanup (9a)
 - images, environments, deploy workflows, releases and Dependabot (9b)
+- Azure login and Bicep provisioning in `deploy.yml`, the `infra` CI job, and the `infra-whatif.yml` PR preview (23a; the infrastructure itself is in [infra.md](infra.md))
 
-The deploy workflows have no Azure steps yet (Phase 23).
+The deploy workflows provision the Azure platform but don't roll out the image yet (23b).
 
 ```mermaid
 flowchart LR
@@ -27,6 +28,7 @@ Runs on every pull request and every push to `master`. Permissions: `contents: r
 | `frontend` | `frontend/**`, `shared/**`, `.nvmrc` | Node from `.nvmrc` (24), `npm ci` (npm cache), `tsc --noEmit`, `jest --ci`, `expo lint`, `expo export --platform web` |
 | `backend` | `backend/**`, `shared/**` | uv (cache keyed on `backend/uv.lock`), Python 3.12, `uv sync --locked`, `ruff check`, `pytest` against a `postgres:18` service container |
 | `docker` | `backend/**`, `shared/data/**`, `.dockerignore` | Builds `backend/Dockerfile` (context = repo root) with buildx and the GHA layer cache; **no push** |
+| `infra` | `infra/**` | Installs Bicep (pinned, `v0.49.2`), then [`infra/lint.sh`](../infra/lint.sh): `bicep lint` with SARIF output on every `.bicep` / `.bicepparam`. **Any** diagnostic fails the job, including linter warnings and compiler (BCP) warnings. Rule levels are in `infra/bicepconfig.json`. No Azure login. |
 | `ci-ok` | always | Fails if any job above failed or was cancelled; skipped jobs count as passing |
 
 Every filter also matches `.github/workflows/ci.yml`, so a change to CI runs every job. `shared/**` feeds both sides: the engine tests read `shared/data/raw`, and so do the seed and the image.
@@ -39,7 +41,7 @@ Every filter also matches `.github/workflows/ci.yml`, so a change to CI runs eve
 
 ### Reproducing a failure locally
 
-CI runs the same commands as [`/verify`](../.claude/skills/verify/SKILL.md) (which also runs an Android export). Run `bash .claude/skills/verify/verify.sh`, or the single step from the table in `frontend/` or `backend/`. The backend tests need Compose Postgres up (`docker compose up -d postgres`). The image: `docker build -f backend/Dockerfile .` from the repo root.
+CI runs the same commands as [`/verify`](../.claude/skills/verify/SKILL.md) (which also runs an Android export; it doesn't cover `infra/`). Run `bash .claude/skills/verify/verify.sh`, or the single step from the table in `frontend/` or `backend/`. The backend tests need Compose Postgres up (`docker compose up -d postgres`). The image: `docker build -f backend/Dockerfile .` from the repo root. Bicep: install the [Bicep CLI](https://github.com/Azure/bicep/releases) and `jq`, then `BICEP=<path to bicep> bash infra/lint.sh`.
 
 ## `master` protection
 
@@ -99,7 +101,34 @@ The ref policies mean a workflow started from a feature branch can't deploy to e
 
 ## Deploying (`deploy.yml`)
 
-A reusable workflow with two inputs: `environment` and `image`. It runs in that GitHub environment, so `production` waits for approval before the job starts. It rejects an `image` that isn't `<repo>@sha256:<digest>`, because tags can be moved and digests can't. For now it only logs the digest and writes a job summary. Phase 23 replaces the placeholder step with Azure OIDC login, the Bicep deploy, the migration job, the Container Apps update and a `/health/ready` smoke test.
+A reusable workflow with two inputs: `environment` and `image`. It runs in that GitHub environment, so `production` waits for approval before the job starts. It rejects an `image` that isn't `<repo>@sha256:<digest>`, because tags can be moved and digests can't. Then:
+
+1. **checkout** the commit being deployed. For a release that's the tagged commit, so the infrastructure matches the image.
+2. **`azure/login` with OIDC** as that environment's deploy identity. Both `deploy.yml`'s job **and the caller job** in `deploy-dev.yml` / `deploy-prod.yml` grant `id-token: write`, because a called workflow can't get more permissions than its caller. No other job has it.
+3. **`az deployment group create`** of `infra/main.bicep` with `infra/<dev|prod>.bicepparam` into `rg-cubetutor-<dev|prod>`, on every deploy (incremental, so re-runs converge).
+4. A job summary with the resource group and the `api` URL.
+
+23b adds the migration job, the image rollout (`apiImage` = the digest) and the `/health/ready` smoke test.
+
+**Azure variables** (IDs, not secrets; set them from the bootstrap outputs, see [`infra/README.md`](../infra/README.md#4-set-the-github-variables)):
+
+| Variable | Level | Used by |
+|---|---|---|
+| `AZURE_CLIENT_ID` | environment `dev` / `production` (that env's deploy identity) | `deploy.yml` |
+| `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | repository | `deploy.yml`, `infra-whatif.yml` |
+| `AZURE_WHATIF_CLIENT_ID` | repository (= the dev identity's client ID) | `infra-whatif.yml` |
+
+Tenant and subscription are repository variables because `infra-whatif.yml` has no `environment:` and can't read environment variables.
+
+## Infra preview (`infra-whatif.yml`)
+
+On PRs that touch `infra/**` (or this workflow), it logs in as the **dev** deploy identity and runs `az deployment group what-if` against `rg-cubetutor-dev`. It posts the result as **one** PR comment and updates it on later pushes: the comment is found by a hidden `<!-- infra-whatif -->` marker, using `gh api` (no third-party action).
+
+- PR jobs can't run in the `dev` environment (it only allows `master`), so the dev identity has an extra federated credential for `repo:aepii/cube-tutor:pull_request`. The trade-off is in [infra.md](infra.md#identities-and-rbac).
+- **Prod is never previewed:** the dev identity has no access to it.
+- PRs from forks are skipped (they get no OIDC token and no write token).
+- It isn't a required check; the `infra` job in `ci.yml` is the gate. A failed what-if still fails this workflow and says so in the comment.
+- Permissions: `contents: read`, `id-token: write`, `pull-requests: write`, on that one job.
 
 ## Releases (`deploy-prod.yml`)
 

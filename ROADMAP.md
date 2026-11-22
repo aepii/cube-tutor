@@ -472,7 +472,7 @@ _Builds on:_ Phase 4 (pytest suite, production Dockerfile). _See §3.11._ The de
 Ships as 2 PRs: 9a, then 9b.
 
 **9a — CI**
-- [x] `ci.yml` on every PR and push to `master`: frontend (`tsc`, `jest`, `expo lint`, web export), backend (`ruff`, `pytest` with a Postgres service container), Docker build (no push); path filters with one aggregate required check (`ci-ok`); dependency caching. (Bicep lint moved to 23a: there's no `infra/` yet.)
+- [x] `ci.yml` on every PR and push to `master`: frontend (`tsc`, `jest`, `expo lint`, web export), backend (`ruff`, `pytest` with a Postgres service container), Docker build (no push); path filters with one aggregate required check (`ci-ok`); dependency caching. (Bicep lint moved to 23a: done there, the `infra` job.)
 - [x] Branch protection on `master`: PR required, CI must pass, no direct pushes or force-pushes (a ruleset kept in `.github/rulesets/master.json`, applied once 9a's checks exist)
 - [x] Branch cleanup: head branches deleted when a PR is merged (repo setting) or closed without merging (`cleanup-branch.yml`)
 
@@ -491,13 +491,13 @@ _Builds on:_ Phase 4 (health endpoints, env config), Phase 9 (workflows, environ
 
 Ships as 3 PRs in order: 23a → 23b → 23c.
 
-**23a — Infrastructure (provisioned, nothing deployed)** **[review closely: Bicep, identity]**
-- [ ] **Budget alert ($5) in Bicep**, created before anything else
-- [ ] `infra/` Bicep modules: Container Apps environment + `api` app, Postgres server (shared) + per-environment database, Static Web App, storage account, Key Vault, Log Analytics + App Insights, user-assigned managed identity, RBAC role assignments; `dev.bicepparam` / `prod.bicepparam`
-- [ ] GitHub OIDC: federated credentials per environment; Azure IDs stored as environment variables, not secrets
-- [ ] `infra-whatif.yml` posts the planned infra changes on PRs
-- [ ] Bicep `build` + lint job in `ci.yml` (moved from 9a), path-filtered on `infra/**`
-- [ ] One-time bootstrap documented in `infra/README.md` (create resource groups + OIDC identities) — the only manual step
+**23a — Infrastructure (provisioned, nothing deployed)** **[review closely: Bicep, identity]** (issue #29)
+- [x] **One-time bootstrap** `infra/bootstrap.bicep` (subscription scope), run by the owner from **Azure Cloud Shell** per `infra/README.md` (the only manual step): **$5 budget filtered to the `rg-cubetutor-*` groups, created first**; resource groups; shared Postgres server + `cubetutor_dev` / `cubetutor_prod`; one deploy identity per environment (user-assigned managed identity) with its RBAC (Contributor + conditional RBAC Administrator on its own resource group)
+- [x] `infra/main.bicep` + modules (per environment): Container Apps environment + `api` app (placeholder image), Static Web App, storage account, Key Vault, Log Analytics + App Insights, the `api` identity and its role assignments; `dev.bicepparam` / `prod.bicepparam`
+- [x] **Provisioning runs in `deploy.yml` on every deploy** (OIDC login, `az deployment group create`)
+- [x] GitHub OIDC: environment-scoped federated credentials (plus `pull_request` on the dev identity for what-if); Azure IDs stored as variables, not secrets
+- [x] `infra-whatif.yml` posts the planned infra changes (against dev) as one PR comment
+- [x] Bicep `build` + lint job in `ci.yml` (moved from 9a), path-filtered on `infra/**`, warnings fail
 
 **23b — API deploy**
 - [ ] Migrations as a Container Apps Job (`alembic upgrade head`), run and awaited by the deploy before the new API revision takes traffic

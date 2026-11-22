@@ -1,7 +1,10 @@
 # Reusable deploy of one image digest to one GitHub environment.
 # Called by deploy-dev.yml (dev) and deploy-prod.yml (production; the
 # environment's required reviewer approves before this job starts).
-# Phase 23 replaces the placeholder step with the Azure deploy.
+# 23a: logs in to Azure with OIDC (no stored secret) as that environment's
+# deploy identity and applies infra/main.bicep to rg-cubetutor-<env>.
+# The callers must grant `id-token: write` to the job that calls this file.
+# 23b adds the migration job, the image rollout and the smoke test. See docs/infra.md.
 name: Deploy
 
 on:
@@ -24,6 +27,9 @@ jobs:
     name: deploy to ${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write # OIDC token for azure/login; only this job gets it
     steps:
       - name: check the image is pinned by digest
         env:
@@ -34,19 +40,55 @@ jobs:
             echo "::error::image must be <repo>@sha256:<digest>, got '$IMAGE'"
             exit 1
           fi
-      - name: deploy (placeholder until Phase 23)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # The commit being deployed (for a release: the tagged commit), so the
+        # infrastructure matches the image.
+      - name: resource group and parameters for this environment
+        id: target
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          case "$ENVIRONMENT" in
+            dev)        short=dev ;;
+            production) short=prod ;;
+            *) echo "::error::unknown environment '$ENVIRONMENT'"; exit 1 ;;
+          esac
+          echo "resource_group=rg-cubetutor-$short" >> "$GITHUB_OUTPUT"
+          echo "params=infra/$short.bicepparam" >> "$GITHUB_OUTPUT"
+      - name: azure login (OIDC)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          # Variables, not secrets: IDs aren't credentials. The federated
+          # credential on the identity trusts only this repo + environment.
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: provision infrastructure (Bicep)
+        id: bicep
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          PARAMS: ${{ steps.target.outputs.params }}
+        run: |
+          # Same Bicep version as the `infra` CI job (ci.yml).
+          az bicep install --version v0.49.2
+          # Incremental mode: resources not in the template are left alone.
+          api_url=$(az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "cubetutor-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --parameters "$PARAMS" \
+            --query properties.outputs.apiUrl.value --output tsv)
+          echo "api_url=$api_url" >> "$GITHUB_OUTPUT"
+      - name: summary
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           IMAGE: ${{ inputs.image }}
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          API_URL: ${{ steps.bicep.outputs.api_url }}
         run: |
-          # Phase 23: Azure OIDC login, Bicep deploy, migration job
-          # (alembic upgrade head) and wait, point Container Apps at $IMAGE,
-          # smoke-test /health/ready.
-          echo "Deploying $IMAGE to $ENVIRONMENT"
           {
             echo "### Deploy to \`$ENVIRONMENT\`"
             echo
-            echo "Image: \`$IMAGE\`"
-            echo
-            echo "_No Azure steps yet (Phase 23)._"
+            echo "- Resource group: \`$RESOURCE_GROUP\` (infra/main.bicep applied)"
+            echo "- api: $API_URL (placeholder image until 23b)"
+            echo "- Image built for this commit: \`$IMAGE\` (rolled out from 23b)"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -12,3 +12,4 @@ Short records of significant choices, written **after the fact** from evidence i
 | [0004](0004-celery-redis-worker.md) | Celery + Redis for background work (planned to be superseded by Service Bus) | Commit `bf3d73c`; ROADMAP §5, §3.10 (stated) |
 | [0005](0005-one-python-package-uv.md) | One Python package + image for API and worker (three commands), managed by uv | Issue #18; ROADMAP §4.1 #6, §4.2, §3.11 (stated) |
 | [0006](0006-trunk-based-release-tags.md) | Trunk-based branching + release tags; build the image once, promote by digest | Issues #26, #27; ROADMAP §3.11 (stated) |
+| [0007](0007-azure-container-apps-bicep.md) | Azure Container Apps + Bicep; GitHub OIDC through user-assigned managed identities with conditional RBAC | Issue #29; ROADMAP §3.9, §3.11, §3.12 (stated) |
