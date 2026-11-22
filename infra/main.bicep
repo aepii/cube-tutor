@@ -26,6 +26,12 @@ var migrate = empty(migrateImage) ? api : migrateImage
 @description('Log Analytics daily ingestion cap in GB; a cost guardrail (5 GB/month is free).')
 param logDailyQuotaGb string = '0.15'
 
+@description('Allow the Static Web App PR preview hosts as CORS origins (dev only: previews call the dev API).')
+param allowPreviewOrigins bool = false
+
+@description('Fraction of API traces sent to App Insights (0-1), as a string.')
+param tracesSampleRatio string = '1.0'
+
 var tags = {
   app: 'cubetutor'
   env: environmentName
@@ -70,6 +76,15 @@ module storage 'modules/storage.bicep' = {
   }
 }
 
+// PR previews live at <sub>-<PR#>.<region>.<rest>, where the default hostname
+// is <sub>.<rest> (e.g. gentle-sea-0abc12345.2.azurestaticapps.net). The
+// default hostname has no region, so that label is [a-z0-9]+; <sub> carries a
+// hash unique to this site. Anchored, https only, numeric suffix = PR previews.
+var swaHost = staticWebApp.outputs.defaultHostname
+var swaSub = split(swaHost, '.')[0]
+var swaRest = substring(swaHost, length(swaSub) + 1)
+var previewOriginRegex = '^https://${swaSub}-[0-9]+\\.[a-z0-9]+\\.${replace(swaRest, '.', '\\.')}$'
+
 module containerApps 'modules/containerApps.bicep' = {
   name: 'containerapps'
   params: {
@@ -82,6 +97,9 @@ module containerApps 'modules/containerApps.bicep' = {
     isBackendImage: api != placeholderImage
     keyVaultUri: keyVault.outputs.uri
     corsOrigins: 'https://${staticWebApp.outputs.defaultHostname}'
+    corsOriginRegex: allowPreviewOrigins ? previewOriginRegex : ''
+    appInsightsConnectionString: monitoring.outputs.connectionString
+    tracesSampleRatio: tracesSampleRatio
     tags: tags
   }
 }
@@ -114,5 +132,6 @@ output migrateJobName string = migrateJob.outputs.name
 output apiIdentityClientId string = apiIdentity.properties.clientId
 output keyVaultName string = keyVault.outputs.name
 output storageAccountName string = storage.outputs.name
+output staticWebAppName string = staticWebApp.outputs.name
 output staticWebAppHost string = staticWebApp.outputs.defaultHostname
 output appInsightsName string = monitoring.outputs.appInsightsName

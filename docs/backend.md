@@ -11,11 +11,27 @@ Every environment-specific value is an env var read by [`core/settings.py`](../b
 | `DATABASE_URL` | required | engine ([`core/db.py`](../backend/app/core/db.py)), health probe, Alembic `env.py`, seed | `postgresql://…` (psycopg2) |
 | `SECRET_KEY` | required | [`core/security.py`](../backend/app/core/security.py) | HS256 signing key for JWTs |
 | `CORS_ORIGINS` | `[]` (no browser origins) | [`main.py`](../backend/app/main.py) | Comma-separated (`http://a,http://b`) or a JSON list. Compose fallback `http://localhost:8081,http://localhost:8080` (Expo web) |
+| `CORS_ORIGIN_REGEX` | unset (exact list only) | `main.py` | Extra origins by regex (Starlette full-matches it; anchor it anyway). Compiled at startup, so a bad pattern stops the process. Set only in **dev** on Azure, for the Static Web App's PR preview hosts ([infra.md](infra.md#secrets)) |
 | `SQL_ECHO` | `false` | `core/db.py` | `true` logs every SQL statement |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | unset (no telemetry) | [`core/telemetry.py`](../backend/app/core/telemetry.py) | Turns on the Azure Monitor OpenTelemetry distro (see [Telemetry](#telemetry)). Set by Bicep on Azure only |
+| `OTEL_SERVICE_NAME` | `unknown_service` | the distro | Cloud role name in App Insights; Azure sets `cubetutor-api` |
+| `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | distro default: rate-limited, 5 traces/s | the distro | Azure sets `microsoft.fixed_percentage` and the ratio (`tracesSampleRatio` in `main.bicep`, default `1.0`) |
+| `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS` | `health/.*` (set by `core/telemetry.py` if unset) | FastAPI instrumentation | Requests not traced |
 
 The Compose-only variables (`POSTGRES_*`, `*_HOST_PORT`, `PGADMIN_*`) configure the containers, not the app. `TEST_DATABASE_URL` is read only by the tests (see [Tests](#tests)).
 
 `main.py` builds the app with `create_app(settings)`; the module-level `app` uses the env settings, and tests can build one with other settings.
+
+## Telemetry
+
+[`core/telemetry.py`](../backend/app/core/telemetry.py) `configure_telemetry(settings)` calls `configure_azure_monitor()` from `azure-monitor-opentelemetry`. That's the distro: the OpenTelemetry SDK, the App Insights exporter, and the FastAPI, psycopg2, requests/urllib/httpx and logging instrumentations.
+
+- **Only when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.** Otherwise it returns at once, and the SDK isn't even imported. Locally, in Compose and in pytest there is no telemetry.
+- **Once per process, before the app is built.** `main.py` calls it at module level, just before `app = create_app(settings)`. The FastAPI instrumentation patches the `FastAPI` class, so it has to come first. It's never called inside `create_app`, because tests build many apps. A module flag makes a second call a no-op. The instrumentation replaces the `fastapi.FastAPI` attribute with a traced subclass, so `create_app` calls `fastapi.FastAPI(...)` (looked up at call time) rather than a `FastAPI` name imported earlier. Otherwise the app would silently not be traced (`test_create_app_uses_the_patched_fastapi_class`).
+- **What's captured:** every request as a *request* (route, status, duration, and exceptions raised in it), with each Postgres query under it as a *SQL dependency* (psycopg2), and Python `logging` records as traces.
+- **Health probes aren't traced.** `/health/*` is excluded from the FastAPI instrumentation. `/health/ready` also runs its `SELECT 1` inside `suppress_instrumentation()`, or that query would be sent as an orphan dependency every 10 s. Both protect the Log Analytics daily cap.
+- The distro adds ~35 MB to the image (209 → 244 MB).
+- Finding a trace in Azure: [infra.md § Telemetry](infra.md#telemetry).
 
 ## Data model
 
@@ -131,7 +147,7 @@ uv run ruff check .
 - **Schema and cleanup:** once per session, `DROP SCHEMA public CASCADE` (which also drops `alembic_version`) then `alembic upgrade head`, so every run builds the DB from the real migrations. After each test, `TRUNCATE … RESTART IDENTITY CASCADE` on every model table. Tests don't depend on order.
 - **Migrations:** [`test_migrations.py`](../backend/tests/test_migrations.py) runs `alembic check` (fails if a model changed without a migration) and walks `downgrade base` → `upgrade head`.
 - **Clock:** no global clock fixture; `jti` makes every token unique. Tests that need same-second tokens monkeypatch `datetime` in `app.core.security` with a frozen clock. Auth tests also cover the stored sha256, the single token lookup (counted with a `before_cursor_execute` listener), expired rows, cleanup on login, and the register race (a `get_session` override whose `select(User)` finds nothing).
-- **Config and probes:** [`test_settings.py`](../backend/tests/test_settings.py) (CORS parsing in both forms, `SQL_ECHO` default), [`test_cors.py`](../backend/tests/test_cors.py) (preflight against an app built with `create_app`), [`test_health.py`](../backend/tests/test_health.py) (503 by overriding the `get_probe_engine` dependency with an engine pointed at an unreachable port).
+- **Config and probes:** [`test_settings.py`](../backend/tests/test_settings.py) (CORS parsing in both forms, `SQL_ECHO` default), [`test_cors.py`](../backend/tests/test_cors.py) (preflight against an app built with `create_app`: the exact list, a preview origin allowed by `CORS_ORIGIN_REGEX` and rejected without it, look-alike origins rejected, a bad regex fails), [`test_telemetry.py`](../backend/tests/test_telemetry.py) (the distro module is replaced by a recorder: not called without a connection string, called once with one, the `/health` exclusion default), [`test_health.py`](../backend/tests/test_health.py) (503 by overriding the `get_probe_engine` dependency with an engine pointed at an unreachable port).
 - **Algorithms and constraints:** [`test_algs.py`](../backend/tests/test_algs.py) covers ordering (cases inserted out of order), the `subset` filter and its 422, and the PUT flags (set twice → one row, clear, independence, per-user, 404/401/422, old POST → 405). [`test_constraints.py`](../backend/tests/test_constraints.py) inserts a duplicate for each unique key and checks the `IntegrityError` names the expected constraint.
 - **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.

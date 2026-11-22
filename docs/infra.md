@@ -2,7 +2,7 @@
 
 What runs on Azure, how it gets there, and who may change it. Bicep is in [`infra/`](../infra/) (runbook: [`infra/README.md`](../infra/README.md)). Why Container Apps + Bicep + managed-identity OIDC: [ADR 0007](decisions/0007-azure-container-apps-bicep.md). Pipeline: [ci-cd.md](ci-cd.md).
 
-Status (23b): the backend image runs on Container Apps in `dev` (every merge to `master`) and `prod` (every approved release). Each deploy runs migrations as a Container Apps Job first, and the app reads its secrets from Key Vault. The Static Web App is still empty until 23c.
+Status (23c): the backend image runs on Container Apps in `dev` (every merge to `master`) and `prod` (every approved release). Each deploy runs migrations as a Container Apps Job first, and the app reads its secrets from Key Vault. Each deploy then uploads a web build to the environment's Static Web App, and PRs get preview sites against the dev API. The API sends OpenTelemetry to App Insights.
 
 ## Two templates, two runners
 
@@ -23,7 +23,7 @@ Why the split: the deploy identities can't create themselves, and limiting each 
 |---|---|---|
 | Postgres Flexible Server | `psql-cubetutor-<6 chars>` | B1ms Burstable, Postgres 18, 32 GB, no HA / geo-backup; password auth; public access + "allow Azure services" rule |
 | Postgres databases | `cubetutor_dev`, `cubetutor_prod` | one server for both: only one B1ms is free |
-| Managed identity | `id-cubetutor-deploy-dev` | GitHub deploys to dev + PR what-if |
+| Managed identity | `id-cubetutor-deploy-dev` | GitHub deploys to dev + PR what-if + PR web previews |
 | Managed identity | `id-cubetutor-deploy-prod` | GitHub deploys to production |
 
 **Subscription:** budget `budget-cubetutor` (see Cost guardrails).
@@ -34,13 +34,13 @@ Why the split: the deploy identities can't create themselves, and limiting each 
 |---|---|---|
 | `Microsoft.ManagedIdentity/userAssignedIdentities` | `id-cubetutor-api-<env>` | the `api` app's identity |
 | `Microsoft.OperationalInsights/workspaces` | `log-cubetutor-<env>` | Container Apps logs; 30-day retention, 0.15 GB/day cap |
-| `Microsoft.Insights/components` | `appi-cubetutor-<env>` | workspace-based App Insights (used from 23c) |
+| `Microsoft.Insights/components` | `appi-cubetutor-<env>` | workspace-based App Insights; the `api` sends traces to it (see [Telemetry](#telemetry)) |
 | `Microsoft.KeyVault/vaults` | `kv-cubetutor-<env>-<6 chars>` | RBAC mode, soft delete 7 days, purge protection off |
 | `Microsoft.Storage/storageAccounts` | `stcubetutor<env><8 chars>` | Standard LRS, no public blob access, shared keys off, TLS 1.2 |
-| `Microsoft.App/managedEnvironments` | `cae-cubetutor-<env>` | workload-profiles environment, Consumption profile only |
+| `Microsoft.App/managedEnvironments` | `cae-cubetutor-<env>` | `environmentMode: WorkloadProfiles` (set explicitly), Consumption profile only. From API `2026-07-01`, an environment created without a mode becomes `Express`, which rejects Key Vault secret references (`ExpressKeyVaultSecretsNotSupported`). If a deploy can't switch an existing `Express` environment in place, delete it together with its apps and jobs; the next deploy recreates them. Check the mode with (`az rest --method get --url "https://management.azure.com<env id>?api-version=2026-07-01" --query properties.environmentMode`) |
 | `Microsoft.App/containerApps` | `ca-cubetutor-api-<env>` | the backend image by digest on port 8000, external HTTPS ingress, 0–2 replicas (HTTP scale rule, 10 concurrent requests each), 0.25 vCPU / 0.5 GiB, probes on `/health/*` |
 | `Microsoft.App/jobs` | `caj-cubetutor-migrate-<env>` | manual trigger, `alembic upgrade head && python -m seed.seed_algorithms`, 10-minute replica timeout, no retries |
-| `Microsoft.Web/staticSites` | `swa-cubetutor-<env>` | Free plan, empty until 23c |
+| `Microsoft.Web/staticSites` | `swa-cubetutor-<env>` | Free plan; the Expo web build, uploaded by `deploy.yml`. Dev also hosts up to 3 PR preview environments (`web-preview.yml`) |
 
 Azure may add a Smart Detection action group / alert rule for App Insights on its own; those aren't from the template.
 
@@ -59,7 +59,7 @@ No secret is stored anywhere. GitHub Actions asks GitHub for an OIDC token, and 
 | you (the user who ran the bootstrap) | — | Key Vault Secrets Officer | `rg-cubetutor-dev`, `rg-cubetutor-prod` |
 
 - **Environment-scoped subjects.** A token for `environment:dev` exists only in a job running in the `dev` GitHub environment, which only `master` may use. A `production` token requires a `v*` tag **and** the owner's approval. So the GitHub environment rules ([ci-cd.md](ci-cd.md#environments)) are what guard Azure.
-- **The `pull_request` subject (dev only)** lets `infra-whatif.yml` log in on PRs, which can't use the `dev` environment. The trade-off: anyone who can push a branch to this repo can act as the dev deployer. In this solo repo that's the owner, who can already merge to `master`. Fork PRs get no OIDC token from GitHub, so they can't use it. Prod has no such credential.
+- **The `pull_request` subject (dev only)** lets `infra-whatif.yml` and `web-preview.yml` log in on PRs, which can't use the `dev` environment. The trade-off: anyone who can push a branch to this repo can act as the dev deployer. In this solo repo that's the owner, who can already merge to `master`. Fork PRs get no OIDC token from GitHub, so they can't use it. Prod has no such credential.
 - **Conditional RBAC Administrator.** Contributor can't create role assignments, but `main.bicep` has to grant the `api` identity its two roles. RBAC Administrator does that, limited by an ABAC condition (`infra/modules/bootstrap/rgRoles.bicep`): it may create or delete assignments only for **Key Vault Secrets User** and **Storage Blob Data Contributor**, and only to **service principals** (managed identities). So the deploy identity can't make anything Owner, give itself more rights, or grant a user anything. When the template needs a new role, add its ID to that list and re-run the bootstrap.
 - **Deploy identities live in the shared group**, so Contributor on its own environment's group can't delete or re-point the identity it logs in with. Nothing is granted at subscription scope. A deploy identity can't see the other environment or the other project in this subscription.
 - **Same image, own identity:** the `api` identity is separate from the deploy identity. The running app can read secrets and blobs, but can't change infrastructure. The migration job runs as the `api` identity too, so it needed no new role through the deploy identity's condition.
@@ -75,7 +75,9 @@ No secret is stored anywhere. GitHub Actions asks GitHub for an OIDC token, and 
 - **Set once by the owner** in Cloud Shell ([runbook step 6](../infra/README.md#6-create-the-app-database-users-and-secrets-once-per-environment)), along with rotation. No workflow generates or rotates them: the deploy identity has no data-plane access to the vault.
 - **Key Vault references:** the `api` app and the migration job declare each secret as `{ keyVaultUrl: <vault>/secrets/<name>, identity: <api identity> }`. Container Apps fetches it as that identity. The value is never in Bicep, the deployment history or `az containerapp show`. The URLs carry no version, so a new value is picked up within ~30 minutes, or on a revision restart.
 - **A missing secret fails the deploy** at the first Bicep step, before anything changes.
-- `CORS_ORIGINS` is a plain env var: `https://<Static Web App default hostname>`. PR preview origins come in 23c.
+- `CORS_ORIGINS` is a plain env var: `https://<Static Web App default hostname>`.
+- **`CORS_ORIGIN_REGEX`, dev only** (`allowPreviewOrigins = true` in `dev.bicepparam`). PR previews live at `<sub>-<PR#>.<region>.<rest>`, where the default hostname is `<sub>.<rest>` (e.g. `gentle-sea-0abc12345.2.azurestaticapps.net`). The PR number isn't known in advance, so `main.bicep` builds `^https://<sub>-[0-9]+\.[a-z0-9]+\.<rest, dots escaped>$` from the real default hostname. The default hostname doesn't include the region, so the region label is `[a-z0-9]+`. `<sub>` carries a hash unique to this site, and only Azure can create hosts under `azurestaticapps.net`, so only this site's previews match. It's anchored at both ends, https only, and the numeric suffix means PR environments only. Prod has no regex: exact origin only.
+- `APPLICATIONINSIGHTS_CONNECTION_STRING`, `OTEL_SERVICE_NAME=cubetutor-api` and `OTEL_TRACES_SAMPLER(_ARG)` are plain env vars. Microsoft treats the connection string as an identifier, not a secret: it only allows *sending* telemetry. It goes straight from the `monitoring` module to the app and isn't a template output. Putting it in Key Vault would need the deploy identity to write secrets, which it deliberately can't.
 - **One database role per environment.** `cubetutor_<env>_app` owns only `cubetutor_<env>`. `CONNECT` is revoked from `PUBLIC` on both databases, so the dev role can't connect to the prod database. The admin login isn't in any app config. Postgres requires TLS (`sslmode=require`).
 
 ## How it's deployed
@@ -108,6 +110,23 @@ The old `api` revision keeps serving while the migration job runs on the new ima
 3. **Contract** in a later deploy: drop or rename what the old code needed, once no running revision uses it.
 
 Never rename or drop a column in the same deploy as the code change. The seed runs in the job on every deploy, so it has to stay idempotent. See also [`backend/CLAUDE.md`](../backend/CLAUDE.md#changing-the-schema).
+
+## Telemetry
+
+The `api` uses the Azure Monitor OpenTelemetry distro (code side: [backend.md § Telemetry](backend.md#telemetry)). It sends to `appi-cubetutor-<env>`, which stores everything in `log-cubetutor-<env>`:
+
+| App Insights | Log Analytics table | What |
+|---|---|---|
+| requests | `AppRequests` | every API request except `/health/*` (route, status, duration) |
+| dependencies | `AppDependencies` | each Postgres query (psycopg2), as a child of its request |
+| exceptions | `AppExceptions` | unhandled exceptions in a request |
+| traces | `AppTraces` | Python `logging` records |
+
+- **Cloud role name** `cubetutor-api` (`OTEL_SERVICE_NAME`). Phase 24's worker will get its own.
+- **Sampling:** fixed percentage, `tracesSampleRatio` in `main.bicep` (default `1.0` = everything). Lower it in the bicepparam if ingestion grows.
+- **Ingestion cap:** the workspace stops ingesting at **0.15 GB/day** (Container Apps logs included) until the next UTC day. That's why the health probes are kept out of tracing: readiness alone runs every 10 s per replica. Check the daily volume in the workspace under *Usage and estimated costs*, or with `Usage | where TimeGenerated > ago(1d) | summarize sum(Quantity) by DataType`.
+- **Finding a trace:** App Insights → *Transaction search* (or *Performance* → a request → *Drill into samples*). Filter on cloud role `cubetutor-api`, then open a request to see its SQL dependencies in the end-to-end view. Data shows up 1–5 minutes after the request. In Logs: `AppRequests | where AppRoleName == "cubetutor-api" | order by TimeGenerated desc`.
+- The migration job isn't instrumented. Phase 24 adds trace context across Service Bus; dashboards and alerts are Phase 19. No browser telemetry.
 
 ## Cost guardrails
 

@@ -1,0 +1,153 @@
+# On PRs that touch the web app: build it against the DEV API, deploy it as a
+# Static Web Apps preview environment of swa-cubetutor-dev, and keep ONE PR
+# comment with its URL. Closing the PR deletes the preview (Free plan: max 3).
+# Logs in as the dev deploy identity through its `pull_request` federated
+# credential, like infra-whatif.yml. `pull_request` only, never
+# `pull_request_target`: the PR's code runs with the PR's own token, and fork
+# PRs (no OIDC token, read-only token) are skipped. The dev API accepts these
+# origins through CORS_ORIGIN_REGEX (dev only). See docs/ci-cd.md.
+name: Web preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    # Also applies to `closed`: a PR that touched these still does when it closes.
+    paths:
+      - 'frontend/**'
+      - 'shared/**'
+      - '.nvmrc'
+      - '.github/workflows/web-preview.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-preview-${{ github.event.pull_request.number }}
+  # A newer push replaces an in-flight build; `closed` waits behind it.
+  cancel-in-progress: ${{ github.event.action != 'closed' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preview:
+    name: preview (dev API)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for azure/login
+      pull-requests: write # create/update the preview comment
+    env:
+      RESOURCE_GROUP: rg-cubetutor-dev
+      SWA_NAME: swa-cubetutor-dev
+      API_APP: ca-cubetutor-api-dev
+      MARKER: '<!-- web-preview -->'
+      CLOSING: ${{ github.event.action == 'closed' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.CLOSING != 'true'
+      - name: azure login (OIDC, dev identity)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          # Repository variables: no `environment:` on a PR job.
+          client-id: ${{ vars.AZURE_WHATIF_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: deployment token and dev API URL
+        id: azure
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          token=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" \
+            --query properties.apiKey --output tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          # Closing only needs the token: deleting a preview must never depend on the API.
+          [ "$CLOSING" = "true" ] && exit 0
+          # The dev API can be missing (e.g. a PR that recreates the environment:
+          # it only comes back when Deploy dev runs after merge). Still deploy the
+          # preview, say so in the comment, and leave the API URL empty.
+          if fqdn=$(az containerapp show --name "$API_APP" --resource-group "$RESOURCE_GROUP" \
+              --query properties.configuration.ingress.fqdn --output tsv) && [ -n "$fqdn" ]; then
+            echo "api_url=https://$fqdn" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$API_APP not found in $RESOURCE_GROUP; the preview is built without an API URL, so API calls will fail."
+          fi
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.CLOSING != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: build against the dev API
+        if: env.CLOSING != 'true'
+        working-directory: frontend
+        env:
+          EXPO_PUBLIC_API_URL: ${{ steps.azure.outputs.api_url }}
+          EXPO_NO_TELEMETRY: '1'
+        run: |
+          npm ci
+          npx expo export --platform web --output-dir dist
+          test -f dist/staticwebapp.config.json
+
+      # On a pull_request event the action deploys to the preview environment
+      # named after the PR number (<host>-<PR#>.<region>.…), and `close` deletes it.
+      - name: deploy preview
+        id: deploy
+        if: env.CLOSING != 'true'
+        uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1 (branch head)
+        with:
+          action: upload
+          azure_static_web_apps_api_token: ${{ steps.azure.outputs.token }}
+          app_location: frontend/dist
+          skip_app_build: true
+          skip_api_build: true
+      - name: delete preview
+        if: env.CLOSING == 'true'
+        uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1 (branch head)
+        with:
+          action: close
+          azure_static_web_apps_api_token: ${{ steps.azure.outputs.token }}
+          app_location: /
+
+      - name: post or update the PR comment
+        if: always() && steps.azure.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          URL: ${{ steps.deploy.outputs.static_web_app_url }}
+          DEPLOY: ${{ steps.deploy.outcome }}
+          API_URL: ${{ steps.azure.outputs.api_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "$MARKER"
+            echo "### Web preview"
+            echo
+            if [ "$CLOSING" = "true" ]; then
+              echo "Preview environment deleted (PR closed)."
+            elif [ "$DEPLOY" = "success" ] && [ -n "$URL" ] && [ -z "$API_URL" ]; then
+              echo "**$URL** (⚠️ the dev API isn't deployed, so login and API calls fail; it returns with the next \`Deploy dev\`)"
+            elif [ "$DEPLOY" = "success" ] && [ -n "$URL" ]; then
+              echo "**$URL** (calls the dev API: $API_URL)"
+            else
+              echo "**Preview deploy failed.** See the [run]($RUN_URL)."
+            fi
+            echo
+            echo "Commit \`${HEAD_SHA:0:7}\` · [workflow run]($RUN_URL)"
+          } > comment.md
+
+          # Update our earlier comment (found by the hidden marker) instead of adding one per push.
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$MARKER\"))) | .id" \
+            | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@comment.md > /dev/null
+            echo "Updated comment $id"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@comment.md > /dev/null
+            echo "Posted a new comment"
+          fi
