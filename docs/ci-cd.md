@@ -4,8 +4,7 @@ GitHub Actions workflows live in [`.github/workflows/`](../.github/workflows/). 
 - the CI gate, `master` protection and branch cleanup (9a)
 - images, environments, deploy workflows, releases and Dependabot (9b)
 - Azure login and Bicep provisioning in `deploy.yml`, the `infra` CI job, and the `infra-whatif.yml` PR preview (23a; the infrastructure itself is in [infra.md](infra.md))
-
-The deploy workflows provision the Azure platform but don't roll out the image yet (23b).
+- the API rollout in `deploy.yml`: migration job, then the image, then a smoke test (23b)
 
 ```mermaid
 flowchart LR
@@ -79,7 +78,7 @@ Every push to `master` builds `backend/Dockerfile` **once** and pushes it to `gh
 - The `org.opencontainers.image.source` label links the package to this repo.
 - It doesn't wait for `ci.yml`: the ruleset only lets a PR merge after `ci-ok` passed.
 - Deploys queue rather than cancel (`concurrency: deploy-dev`).
-- **Package visibility:** a package first pushed by `GITHUB_TOKEN` starts private. After the first push, set it to public once: package page → Package settings → Change visibility. There's no REST endpoint for this. Public lets anyone, including Azure in Phase 23, pull it without credentials.
+- **Package visibility:** a package first pushed by `GITHUB_TOKEN` starts private. After the first push, set it to public once: package page → Package settings → Change visibility. There's no REST endpoint for this. Public lets anyone pull it without credentials, including Container Apps, which has no registry credentials configured.
 
 ## Environments
 
@@ -105,10 +104,16 @@ A reusable workflow with two inputs: `environment` and `image`. It runs in that 
 
 1. **checkout** the commit being deployed. For a release that's the tagged commit, so the infrastructure matches the image.
 2. **`azure/login` with OIDC** as that environment's deploy identity. Both `deploy.yml`'s job **and the caller job** in `deploy-dev.yml` / `deploy-prod.yml` grant `id-token: write`, because a called workflow can't get more permissions than its caller. No other job has it.
-3. **`az deployment group create`** of `infra/main.bicep` with `infra/<dev|prod>.bicepparam` into `rg-cubetutor-<dev|prod>`, on every deploy (incremental, so re-runs converge).
-4. A job summary with the resource group and the `api` URL.
+3. **Read the running `api` image** (`az containerapp show`); empty on a fresh environment.
+4. **Bicep, pass 1:** `az deployment group create` of `infra/main.bicep` with `infra/<dev|prod>.bicepparam` into `rg-cubetutor-<dev|prod>`. The migration job gets the new digest; `api` gets the image it already runs, so it doesn't change.
+5. **Migrate:** [`infra/scripts/run-migration.sh`](../infra/scripts/run-migration.sh) starts the job, polls the execution until `Succeeded`, and gives up after 15 minutes. On `Failed`, `Stopped`, `Degraded` or a timeout, it prints the execution's logs (from Log Analytics, which can lag by a minute or two) and fails the step. The run stops there with `api` untouched.
+6. **Bicep, pass 2:** the same deployment with the new digest on `api` too. A new revision takes traffic once its probes pass.
+7. **Smoke test:** polls until the latest revision runs the digest, is the latest ready revision, and `GET <api url>/health/ready` returns 200. Back-off 5 → 10 → 20 → 30 s for up to ~3 minutes (cold start from 0 replicas); otherwise the run fails.
+8. **Summary** (always, even after a failure): image digest, migration execution name and result, rollout result, API URL, `/health/ready` status.
 
-23b adds the migration job, the image rollout (`apiImage` = the digest) and the `/health/ready` smoke test.
+Why this order and the migration rule it implies: [infra.md § How it's deployed](infra.md#how-its-deployed). The workflow runs with `shell: bash` (pipefail) and lets the Azure CLI install extensions without prompting.
+
+**Testing a failed migration:** a feature branch can't deploy (the `dev` environment only allows `master`), so rehearse it from Cloud Shell with [runbook step 7](../infra/README.md#7-rehearse-a-failed-migration-optional). It runs the same script with a command that fails.
 
 **Azure variables** (IDs, not secrets; set them from the bootstrap outputs, see [`infra/README.md`](../infra/README.md#4-set-the-github-variables)):
 
@@ -122,7 +127,7 @@ Tenant and subscription are repository variables because `infra-whatif.yml` has 
 
 ## Infra preview (`infra-whatif.yml`)
 
-On PRs that touch `infra/**` (or this workflow), it logs in as the **dev** deploy identity and runs `az deployment group what-if` against `rg-cubetutor-dev`. It posts the result as **one** PR comment and updates it on later pushes: the comment is found by a hidden `<!-- infra-whatif -->` marker, using `gh api` (no third-party action).
+On PRs that touch `infra/**` (or this workflow), it logs in as the **dev** deploy identity and runs `az deployment group what-if` against `rg-cubetutor-dev`, with `apiImage` set to the image dev runs now (so the preview doesn't show a rollback to the placeholder). It posts the result as **one** PR comment and updates it on later pushes: the comment is found by a hidden `<!-- infra-whatif -->` marker, using `gh api` (no third-party action).
 
 - PR jobs can't run in the `dev` environment (it only allows `master`), so the dev identity has an extra federated credential for `repo:aepii/cube-tutor:pull_request`. The trade-off is in [infra.md](infra.md#identities-and-rbac).
 - **Prod is never previewed:** the dev identity has no access to it.

@@ -1,5 +1,6 @@
-// Key Vault in RBAC mode (no access policies). 23b puts SECRET_KEY and
-// DATABASE_URL here; the api identity reads them as Key Vault Secrets User.
+// Key Vault in RBAC mode (no access policies). Holds `database-url` and
+// `secret-key` (set by the owner, see infra/README.md); the api identity reads
+// them as Key Vault Secrets User through Container Apps Key Vault references.
 param location string
 param name string
 param apiPrincipalId string
@@ -39,3 +40,4 @@ resource secretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 output name string = vault.name
+output uri string = vault.properties.vaultUri

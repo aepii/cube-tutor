@@ -48,10 +48,17 @@ jobs:
           AZURE_CORE_NO_COLOR: 'true'
         run: |
           az bicep install --version v0.49.2
+          az config set extension.use_dynamic_install=yes_without_prompt
+          # Preview with the image dev runs now (as deploy.yml's first pass does);
+          # otherwise every preview would show api rolling back to the placeholder.
+          current=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name ca-cubetutor-api-dev \
+            --query 'properties.template.containers[0].image' --output tsv 2>/dev/null || true)
+          echo "Running dev api image: ${current:-<none>}"
           set +e
           az deployment group what-if \
             --resource-group "$RESOURCE_GROUP" \
             --parameters infra/dev.bicepparam \
+            ${current:+--parameters apiImage="$current"} \
             > whatif.txt 2>&1
           status=$?
           set -e

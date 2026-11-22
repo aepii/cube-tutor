@@ -5,6 +5,7 @@
 //   - the shared Postgres server with one database per environment
 //   - one deploy identity per GitHub environment (user-assigned managed identity
 //     + federated credential) and its RBAC on its own resource group
+//   - Key Vault Secrets Officer for the person running it, on the env groups
 // The subscription is shared with another project: nothing here touches other
 // resource groups or subscription-wide settings except the RG-filtered budget.
 targetScope = 'subscription'
@@ -30,6 +31,9 @@ param budgetStartDate string = '${utcNow('yyyy-MM')}-01'
 @description('Who gets the budget alert emails.')
 @minLength(1)
 param budgetContactEmails array
+
+@description('Object ID of the user running the bootstrap: gets Key Vault Secrets Officer on the dev and prod resource groups (az ad signed-in-user show --query id -o tsv).')
+param ownerPrincipalId string
 
 @description('Postgres administrator login name.')
 param postgresAdminLogin string = 'cubetutoradmin'
@@ -154,13 +158,15 @@ module deployIdProd 'modules/bootstrap/deployIdentity.bicep' = {
   }
 }
 
-// ---- RBAC: each deploy identity on its own resource group only ----------------
+// ---- RBAC: each deploy identity on its own resource group only, plus the owner's
+// Key Vault Secrets Officer on both environment groups -------------------------
 
 module rolesDev 'modules/bootstrap/rgRoles.bicep' = {
   name: 'deploy-roles-dev'
   scope: rgDev
   params: {
     principalId: deployIdDev.outputs.principalId
+    ownerPrincipalId: ownerPrincipalId
   }
 }
 
@@ -169,6 +175,7 @@ module rolesProd 'modules/bootstrap/rgRoles.bicep' = {
   scope: rgProd
   params: {
     principalId: deployIdProd.outputs.principalId
+    ownerPrincipalId: ownerPrincipalId
   }
 }
 

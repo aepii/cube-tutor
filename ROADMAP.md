@@ -499,9 +499,9 @@ Ships as 3 PRs in order: 23a → 23b → 23c.
 - [x] `infra-whatif.yml` posts the planned infra changes (against dev) as one PR comment
 - [x] Bicep `build` + lint job in `ci.yml` (moved from 9a), path-filtered on `infra/**`, warnings fail
 
-**23b — API deploy**
-- [ ] Migrations as a Container Apps Job (`alembic upgrade head`), run and awaited by the deploy before the new API revision takes traffic
-- [ ] `api`: health probes, scale 0..N on HTTP traffic, secrets from Key Vault via the managed identity, CORS for the Static Web Apps domain
+**23b — API deploy** (issue #41)
+- [x] Migrations as a Container Apps Job (`alembic upgrade head`), run and awaited by the deploy before the new API revision takes traffic
+- [x] `api`: health probes, scale 0..N on HTTP traffic, secrets from Key Vault via the managed identity, CORS for the Static Web Apps domain
 
 **23c — Web deploy + telemetry** **[review diff]**
 - [ ] Web build on Static Web Apps (dev + prod); `EXPO_PUBLIC_API_URL` per environment; PR preview environments pointed at the dev API
