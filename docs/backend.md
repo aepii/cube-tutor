@@ -24,12 +24,15 @@ The Compose-only variables (`POSTGRES_*`, `*_HOST_PORT`, `PGADMIN_*`) configure 
 
 ## Telemetry
 
-[`core/telemetry.py`](../backend/app/core/telemetry.py) `configure_telemetry(settings)` calls `configure_azure_monitor()` from `azure-monitor-opentelemetry`. That's the distro: the OpenTelemetry SDK, the App Insights exporter, and the FastAPI, psycopg2, requests/urllib/httpx and logging instrumentations.
+[`core/telemetry.py`](../backend/app/core/telemetry.py) `configure_telemetry(settings)` calls `configure_azure_monitor()` from `azure-monitor-opentelemetry`. That's the distro: the OpenTelemetry SDK, the App Insights exporter, and a set of instrumentations. We keep psycopg2 and logging, turn off its FastAPI and HTTP-client ones (`DISABLED_INSTRUMENTATIONS`), and instrument FastAPI ourselves right after (see *Not recorded* below).
 
 - **Only when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.** Otherwise it returns at once, and the SDK isn't even imported. Locally, in Compose and in pytest there is no telemetry.
 - **Once per process, before the app is built.** `main.py` calls it at module level, just before `app = create_app(settings)`. The FastAPI instrumentation patches the `FastAPI` class, so it has to come first. It's never called inside `create_app`, because tests build many apps. A module flag makes a second call a no-op. The instrumentation replaces the `fastapi.FastAPI` attribute with a traced subclass, so `create_app` calls `fastapi.FastAPI(...)` (looked up at call time) rather than a `FastAPI` name imported earlier. Otherwise the app would silently not be traced (`test_create_app_uses_the_patched_fastapi_class`).
 - **What's captured:** every request as a *request* (route, status, duration, and exceptions raised in it), with each Postgres query under it as a *SQL dependency* (psycopg2), and Python `logging` records as traces.
-- **Health probes aren't traced.** `/health/*` is excluded from the FastAPI instrumentation. `/health/ready` also runs its `SELECT 1` inside `suppress_instrumentation()`, or that query would be sent as an orphan dependency every 10 s. Both protect the Log Analytics daily cap.
+- **Not recorded**, all to protect the Log Analytics daily cap:
+  - **Health probes.** `/health/*` is excluded from the FastAPI instrumentation. `/health/ready` also runs its `SELECT 1` inside `suppress_instrumentation()`, or that query would be sent as an orphan dependency every 10 s.
+  - **ASGI `send` / `receive` spans.** By default the FastAPI instrumentation records each request's internal send/receive steps as extra `http send` / `http receive` dependencies. The distro instruments FastAPI without options, so its instrumentation is turned off and `_instrument_fastapi()` instruments it with `exclude_spans=["receive", "send"]`. One request = one span (`test_request_has_no_send_receive_spans`).
+  - **The SDK's own HTTP calls.** The exporter polls `/AzMonSDKDynamicConfiguration` with `requests`, which the distro's `requests` instrumentation recorded as dependencies. The app makes no outbound HTTP calls, so the requests/urllib/urllib3/httpx instrumentations are off. **Turn them back on** (remove them from `DISABLED_INSTRUMENTATIONS`) when a feature adds outbound HTTP.
 - The distro adds ~35 MB to the image (209 → 244 MB).
 - Finding a trace in Azure: [infra.md § Telemetry](infra.md#telemetry).
 

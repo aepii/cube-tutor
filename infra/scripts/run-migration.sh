@@ -18,7 +18,7 @@ job="$2"
 shift 2
 
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-900}"   # the job's replica timeout is 600 s; leave room to schedule it
-LOG_WAIT_SECONDS="${LOG_WAIT_SECONDS:-180}" # Log Analytics ingestion lags by a minute or more
+LOG_WAIT_SECONDS="${LOG_WAIT_SECONDS:-300}" # Log Analytics ingestion can lag by several minutes
 
 execution=$(az containerapp job start --name "$job" --resource-group "$rg" "$@" --query name --output tsv)
 if [ -z "$execution" ]; then
@@ -54,17 +54,24 @@ echo "::error::Migration job execution $execution: $status. The api was not chan
 envId=$(az containerapp job show --name "$job" --resource-group "$rg" --query properties.environmentId --output tsv)
 workspace=$(az containerapp env show --ids "$envId" \
   --query properties.appLogsConfiguration.logAnalyticsConfiguration.customerId --output tsv)
-query="ContainerAppConsoleLogs_CL
-| where ContainerJobName_s == '$job' and ContainerGroupName_s startswith '$execution'
-| project TimeGenerated, Log_s
-| order by TimeGenerated asc"
+# One line, so the fallback below prints a command that can be pasted as is.
+query="ContainerAppConsoleLogs_CL | where ContainerJobName_s == '$job' and ContainerGroupName_s startswith '$execution' | project TimeGenerated, Log_s | order by TimeGenerated asc"
 
 echo "Waiting up to ${LOG_WAIT_SECONDS}s for the execution's logs to reach Log Analytics..."
+errfile=$(mktemp)
+trap 'rm -f "$errfile"' EXIT
 deadline=$((SECONDS + LOG_WAIT_SECONDS))
 logs=""
+query_failed=0
 while :; do
-  logs=$(az monitor log-analytics query --workspace "$workspace" --analytics-query "$query" \
-    --timespan PT2H --query "[].Log_s" --output tsv 2>/dev/null || true)
+  # Keep the query's stderr: an error (extension, auth, KQL) must not look like
+  # "the logs haven't arrived yet". Retry anyway, since some errors are transient.
+  if logs=$(az monitor log-analytics query --workspace "$workspace" --analytics-query "$query"       --timespan PT2H --query "[].Log_s" --output tsv 2>"$errfile"); then
+    query_failed=0
+  else
+    query_failed=1
+    logs=""
+  fi
   if [ -n "$logs" ] || [ "$SECONDS" -ge "$deadline" ]; then
     break
   fi
@@ -73,10 +80,18 @@ done
 
 if [ -n "$logs" ]; then
   echo "----- $execution logs -----"
-  printf '%s\n' "$logs"
+  printf '%s
+' "$logs"
   echo "----- end of logs -----"
 else
-  echo "No logs arrived yet. Query the workspace ($workspace) later with:"
-  printf '%s\n' "$query"
+  if [ "$query_failed" -eq 1 ]; then
+    echo "::warning::The Log Analytics query failed, so the logs couldn't be read:"
+    cat "$errfile"
+  else
+    echo "No logs arrived within ${LOG_WAIT_SECONDS}s."
+  fi
+  echo "Read them later with:"
+  echo "az monitor log-analytics query --workspace $workspace --timespan PT2H --query \"[].Log_s\" --output tsv \\"
+  echo "  --analytics-query \"$query\""
 fi
 exit 1

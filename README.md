@@ -8,7 +8,7 @@ An app for learning speedcubing algorithms (OLL, PLL, F2L) on an interactive 3D 
 
 | Environment | Web app | API | Deployed by |
 |---|---|---|---|
-| dev | https://ambitious-sea-075b92410.8.azurestaticapps.net | in the latest `Deploy dev` run summary (URL pending: environment recreated in #42) | every merge to `master` |
+| dev | https://ambitious-sea-075b92410.8.azurestaticapps.net | https://ca-cubetutor-api-dev.greentree-fe731294.centralus.azurecontainerapps.io | every merge to `master` |
 | prod | not deployed yet (first release) | not deployed yet (first release) | a published `vX.Y.Z` release, after approval |
 
 The API scales to zero, so the first request after a quiet spell takes a few seconds.
