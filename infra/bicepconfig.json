@@ -1,0 +1,24 @@
+{
+  "$schema": "https://aka.ms/bicep/config",
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-hardcoded-location": { "level": "warning" },
+        "no-hardcoded-env-urls": { "level": "warning" },
+        "secure-parameter-default": { "level": "warning" },
+        "secure-params-in-nested-deploy": { "level": "warning" },
+        "outputs-should-not-contain-secrets": { "level": "warning" },
+        "protect-commandtoexecute-secrets": { "level": "warning" },
+        "use-secure-value-for-secure-inputs": { "level": "warning" },
+        "use-recent-api-versions": { "level": "warning" },
+        "use-resource-id-functions": { "level": "warning" },
+        "use-stable-resource-identifiers": { "level": "warning" },
+        "no-unused-params": { "level": "warning" },
+        "no-unused-vars": { "level": "warning" },
+        "no-unused-existing-resources": { "level": "warning" },
+        "explicit-values-for-loc-params": { "level": "warning" }
+      }
+    }
+  }
+}

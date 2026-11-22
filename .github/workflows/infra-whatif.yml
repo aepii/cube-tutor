@@ -1,0 +1,106 @@
+# On PRs that touch infra/: preview what infra/main.bicep would change in
+# rg-cubetutor-dev and post it as ONE PR comment, updated on every push.
+# Logs in as the dev deploy identity through its `pull_request` federated
+# credential (PR jobs can't use the `dev` environment: it only allows master).
+# That identity has no access to prod, so prod is never previewed. Fork PRs get
+# no OIDC token and no write token, so they're skipped. See docs/infra.md.
+# Not a required check: the `infra` job in ci.yml (build + lint) is the gate.
+name: Infra what-if
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-whatif.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-whatif-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  whatif:
+    name: what-if (dev)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for azure/login
+      pull-requests: write # create/update the what-if comment
+    env:
+      RESOURCE_GROUP: rg-cubetutor-dev
+      MARKER: '<!-- infra-whatif -->'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: azure login (OIDC, dev identity)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          # Repository variables: this job has no `environment:`, so it can't
+          # read the dev environment's variables.
+          client-id: ${{ vars.AZURE_WHATIF_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: what-if against dev
+        id: whatif
+        env:
+          AZURE_CORE_NO_COLOR: 'true'
+        run: |
+          az bicep install --version v0.49.2
+          set +e
+          az deployment group what-if \
+            --resource-group "$RESOURCE_GROUP" \
+            --parameters infra/dev.bicepparam \
+            > whatif.txt 2>&1
+          status=$?
+          set -e
+          # Strip any colour codes that slip through.
+          sed -i 's/\x1b\[[0-9;]*m//g' whatif.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: post or update the PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STATUS: ${{ steps.whatif.outputs.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "$MARKER"
+            echo "### Infra what-if: \`$RESOURCE_GROUP\`"
+            echo
+            if [ "$STATUS" != "0" ]; then
+              echo "**what-if failed** (exit $STATUS). See the output below and the [run]($RUN_URL)."
+            else
+              echo "What \`infra/main.bicep\` + \`infra/dev.bicepparam\` would change in dev."
+            fi
+            echo
+            echo "Commit \`${HEAD_SHA:0:7}\` · [workflow run]($RUN_URL) · prod is not previewed (the dev identity has no access to it)."
+            echo
+            echo '<details open><summary>what-if output</summary>'
+            echo
+            echo '```'
+            # GitHub comments max out at 65,536 characters.
+            head -c 60000 whatif.txt
+            echo
+            echo '```'
+            [ "$(wc -c < whatif.txt)" -gt 60000 ] && echo "_Output truncated; the full text is in the run log._"
+            echo '</details>'
+          } > comment.md
+          cat whatif.txt
+
+          # Update our earlier comment (found by the hidden marker) instead of adding one per push.
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$MARKER\"))) | .id" \
+            | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@comment.md > /dev/null
+            echo "Updated comment $id"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@comment.md > /dev/null
+            echo "Posted a new comment"
+          fi
+      - name: fail if what-if failed
+        if: steps.whatif.outputs.status != '0'
+        run: exit 1
