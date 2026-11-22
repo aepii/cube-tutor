@@ -57,7 +57,7 @@ Stop and fix before drafting if a doc is now wrong. "No doc change needed" is al
 
 ## 4. Draft the description
 
-Title: the issue title (e.g. `4a: Add pytest suite and ruff config`). Leave out `Closes #` only if the branch has no issue. Show the title and body to the user in chat, and write the body to the session scratchpad for `--body-file`. Use exactly these sections:
+Title: the issue title (e.g. `4a: Add pytest suite and ruff config`). Leave out `Closes #` only if the branch has no issue. Show the title and body to the user in chat, and write them to `.claude-output/<issue#>-<slug>/pr.md`: line 1 `<!-- title: <title> -->` (GitHub doesn't render it), then the body. It's used as `--body-file` and stays local (the folder is gitignored); see [`.claude-output/README.md`](../../../.claude-output/README.md). Use exactly these sections:
 
 ```markdown
 Closes #<issue>
@@ -95,7 +95,6 @@ End with the exact commands that would run, and don't run them:
 
 ```bash
 git push -u origin <branch>
-gh pr create --base master --head <branch> --title "<title>" --body-file <scratchpad>/pr-body.md
+gh pr create --base master --head <branch> --title "<title>" --body-file .claude-output/<issue#>-<slug>/pr.md
 ```
-
 Run them (plus any commit you proposed) only after the user says to. Then report the PR URL.

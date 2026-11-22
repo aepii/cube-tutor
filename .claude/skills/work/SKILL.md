@@ -44,6 +44,8 @@ git switch -c <type>/$n-<short-slug> origin/master
 
 `<type>` comes from the label: `enhancement` → `feat`, `bug` → `fix`, `spike` → `spike`, `documentation` → `docs`, otherwise `chore`. If a branch for this issue already exists (`git branch --list "*/$n-*"`), switch to it and resume. Check `git log origin/master..HEAD` and the diff to see what's already done.
 
+The branch's output folder is `.claude-output/<issue#>-<short-slug>/` (the branch name without its type; gitignored, local only; see [`.claude-output/README.md`](../../../.claude-output/README.md)). `/groom` normally left `issue.md` there. If it's missing (an ad-hoc issue, or one groomed before this folder existed), write it now from the loaded issue, in the format `/groom` uses. If a groomed folder has a different slug than the branch, rename the folder to match the branch.
+
 ## 3. Read before planning
 
 - The docs the root CLAUDE.md "Docs" map names for every area the issue touches, plus related ADRs.
@@ -63,6 +65,8 @@ Enter plan mode (EnterPlanMode) and present:
 
 Exit plan mode for approval. Don't write code until the user approves. If they change the plan in ways that alter the AC, that's a deviation (step 6).
 
+Once approved, save the plan as written (with the user's changes) to `.claude-output/<issue#>-<slug>/plan.md`. The folder is the branch name without its type prefix; see [`.claude-output/README.md`](../../../.claude-output/README.md). Start the file with `# Plan: #<n> <issue title>`. If the plan is re-approved later, overwrite it.
+
 ## 5. Implement
 
 - Stay inside the Scope. Follow existing patterns in the feature folder.
@@ -77,6 +81,7 @@ Exit plan mode for approval. Don't write code until the user approves. If they c
   gh issue comment $n --body-file <scratchpad>/deviation.md   # "**Scope change:** <what> — **Why:** <reason>"
   gh issue edit $n --body-file <scratchpad>/issue-body.md
   ```
+  Then update `.claude-output/<issue#>-<slug>/issue.md` to the edited body, and note the change in `plan.md`.
 - **Out-of-scope findings** (bugs, refactors, ideas): don't fix them. List them in the handoff as proposed follow-ups. The user can `/groom` them.
 
 ## 7. Verify
@@ -95,5 +100,7 @@ Report, in this order:
 4. **Test by hand:** numbered steps on web (`npm run web`) and/or Expo Go, saying what to do and what should happen. Cover every AC that no automated test proves.
 5. **Review hotspots:** files to read closely, one line each.
 6. **Follow-ups:** proposed issues for out-of-scope findings, or none.
+
+Write the same report to `.claude-output/<issue#>-<slug>/implementation.md` (heading `# Implementation: #<n> <issue title>`), plus a short **Changes from the plan** section if anything differed from `plan.md`. If the work changes after handoff, update the file.
 
 End with: "Once you've tested it, run `/pr`." Then stop.
