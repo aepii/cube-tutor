@@ -140,9 +140,9 @@ The script needs the environment's Key Vault, and only `main.bicep` creates it (
 2. **Run the script below** with `E=dev` or `E=prod`. Check the vault exists first: `az keyvault list -g rg-cubetutor-$E -o table`.
 3. **Re-run the failed run** (Actions → the run → *Re-run all jobs*). For prod, the re-run needs approval again.
 
-If the environment already has its secrets (for example after its Container Apps environment was recreated), skip this step.
+If the environment already has its secrets (for example after its Container Apps environment was recreated), skip this step. The script runs once per environment: running it again fails at `CREATE ROLE`, because the role exists. To change a password or the secret key later, see *Rotating a secret* below.
 
-Each environment gets its own Postgres role, which owns only its own database, so the admin login stays out of the app. By default Postgres lets `PUBLIC` connect to every database, so the SQL revokes that on both databases. The dev role can't even connect to `cubetutor_prod`, and the reverse.
+Each environment gets its own Postgres role, which owns only its own database and the `public` schema in it, so the admin login stays out of the app. By default Postgres lets `PUBLIC` connect to every database, so the SQL revokes that on both databases. The dev role can't even connect to `cubetutor_prod`, and the reverse.
 
 ```bash
 E=dev   # then E=prod
@@ -156,7 +156,6 @@ APP_PW=$(openssl rand -hex 24)
 # One quoted line per statement, piped in (no heredoc: a pasted, indented
 # terminator leaves the shell waiting). psql fills in :"role", :"db", :'pw'.
 #  - the admin isn't a superuser on Azure: it must be a member to hand the role a database
-#  - since Postgres 15 the public schema belongs to pg_database_owner, so the owner can create tables
 #  - no database is open to PUBLIC; only its owner and the admin connect
 printf '%s\n' \
   "CREATE ROLE :\"role\" LOGIN PASSWORD :'pw';" \
@@ -167,18 +166,46 @@ printf '%s\n' \
 | psql "host=$PGHOST port=5432 dbname=postgres user=cubetutoradmin sslmode=require" \
     -v ON_ERROR_STOP=1 -v role="cubetutor_${E}_app" -v db="cubetutor_$E" -v pw="$APP_PW"
 
+# Owning the database isn't enough to create tables: on Azure the public schema
+# belongs to azure_pg_admin (vanilla Postgres 15+ gives it to the database owner).
+# It must run connected to that database. The admin can do it because it's a
+# member of both azure_pg_admin and the role.
+printf '%s\n' "ALTER SCHEMA public OWNER TO :\"role\";" \
+| psql "host=$PGHOST port=5432 dbname=cubetutor_$E user=cubetutoradmin sslmode=require" \
+    -v ON_ERROR_STOP=1 -v role="cubetutor_${E}_app"
+
 az keyvault secret set --vault-name "$KV" --name database-url --output none \
   --value "postgresql://cubetutor_${E}_app:${APP_PW}@${PGHOST}:5432/cubetutor_${E}?sslmode=require"
 az keyvault secret set --vault-name "$KV" --name secret-key --output none --value "$(openssl rand -hex 32)"
 unset APP_PW
 ```
 
-- **`psql` can't connect:** Cloud Shell reaches the server through the "allow Azure services" rule. If that doesn't cover it, add your IP with `az postgres flexible-server firewall-rule create -g rg-cubetutor-shared -n "$PG" -r cloudshell --start-ip-address <ip> --end-ip-address <ip>`, and delete the rule afterwards.
+- **`psql` can't connect:** Cloud Shell reaches the server through the "allow Azure services" rule. If that doesn't cover it, add your IP (see *Connecting from your PC* below), and delete the rule afterwards.
+- **Migrations fail with `permission denied for schema public`:** the `ALTER SCHEMA` step didn't run. Check with `psql "host=$PGHOST dbname=cubetutor_$E user=cubetutoradmin sslmode=require" -c '\dn+ public'`. The owner must be `cubetutor_${E}_app`.
 - **`Forbidden` from `az keyvault secret set`:** the Secrets Officer role from step 3 can take a few minutes to apply. Wait, then retry.
 - **Check the isolation** (AC4): connecting as the dev role to the prod database must fail with *permission denied for database "cubetutor_prod"*. Run it while `E=dev`, before the `unset`, or with the password read back from Key Vault:
   ```bash
   psql "host=$PGHOST dbname=cubetutor_prod user=cubetutor_dev_app sslmode=require password=<dev app password>" -c 'select 1'
   ```
+
+**Connecting from your PC (pgAdmin, psql).** The server only accepts Azure IPs, so first add a firewall rule for your public IP. `-s` is the server and `-n` is the rule:
+
+```bash
+PG=$(az postgres flexible-server list -g rg-cubetutor-shared --query "[0].name" -o tsv)
+IP=$(curl -s https://api.ipify.org)
+az postgres flexible-server firewall-rule create -g rg-cubetutor-shared -s "$PG" -n my-pc \
+  --start-ip-address "$IP" --end-ip-address "$IP"
+# when you're done:
+az postgres flexible-server firewall-rule delete -g rg-cubetutor-shared -s "$PG" -n my-pc --yes
+```
+
+In pgAdmin, register a server with:
+- host `<server>.postgres.database.azure.com`, port 5432
+- maintenance database `cubetutor_dev` (or `_prod`)
+- user `cubetutoradmin`, or the app role with the password from the `database-url` secret
+- SSL mode `require`
+
+The admin can change both databases, so be careful with writes. A **timeout** means the network blocked you: there's no rule for your current IP, or your network blocks outbound port 5432. *Password authentication failed* means you reached the server and only the credentials are wrong.
 
 **Rotating a secret.** Each Key Vault reference has no version, so Container Apps reads the latest version of the secret. It picks up a new value within about 30 minutes, or right away after a restart:
 
