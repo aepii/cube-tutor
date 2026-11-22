@@ -1,0 +1,149 @@
+# CI gate for every PR and every push to master. See docs/ci-cd.md.
+# Jobs are skipped by path filter *inside* the workflow, and `ci-ok` is the one
+# required check: a workflow-level `paths:` filter would leave a required check
+# pending forever whenever the workflow is skipped.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded PR runs are cancelled; every push to master gets a full run.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          # Every filter includes this file, so a change to CI runs every job.
+          filters: |
+            frontend:
+              - '.github/workflows/ci.yml'
+              - '.nvmrc'
+              - 'frontend/**'
+              - 'shared/**'
+            backend:
+              - '.github/workflows/ci.yml'
+              - 'backend/**'
+              - 'shared/**'
+            docker:
+              - '.github/workflows/ci.yml'
+              - '.dockerignore'
+              - 'backend/**'
+              - 'shared/data/**'
+
+  frontend:
+    name: frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: tsc
+        run: npx tsc --noEmit
+      - name: jest
+        run: npx jest --ci
+      - name: expo lint
+        run: npx expo lint
+      - name: expo export (web)
+        run: npx expo export --platform web --output-dir dist
+
+  backend:
+    name: backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # tests/conftest.py prefers this, creates the _test database if missing and
+      # sets the remaining settings, so CI needs no .env.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cubetutor_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: uv sync --locked
+        run: uv sync --locked
+      - name: ruff
+        run: uv run --frozen ruff check .
+      - name: pytest
+        run: uv run --frozen pytest -q
+
+  docker:
+    name: docker
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: build backend image (no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # The single required check (.github/rulesets/master.json). Skipped jobs pass;
+  # failed or cancelled ones fail it.
+  ci-ok:
+    name: ci-ok
+    needs: [changes, frontend, backend, docker]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: check job results
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "A required job failed or was cancelled:"
+          echo "$NEEDS"
+          exit 1
+      - run: echo "All required jobs passed or were skipped."

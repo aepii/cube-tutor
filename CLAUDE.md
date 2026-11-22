@@ -52,6 +52,7 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 - `docs/rendering.md`: R3F setup, fiber split, demand frameloop, gestures and turn animation. Before touching cube components, input, or `render/`.
 - `docs/backend.md`: tables, auth flow, endpoint list, migration status. Before touching `backend/` or frontend API/auth code.
 - `docs/data-pipeline.md`: scraper, raw JSON shape, seeding, Celery. Before touching `scraper/`, `shared/data/`, `backend/app/worker/`, or the seed.
+- `docs/ci-cd.md`: GitHub Actions (`ci.yml` jobs, path filters, the `ci-ok` required check), `master` ruleset, branch cleanup. Before touching `.github/`.
 - `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, or Celery.
 
 ## Running

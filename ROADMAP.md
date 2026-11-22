@@ -472,16 +472,17 @@ _Builds on:_ Phase 4 (pytest suite, production Dockerfile). _See §3.11._ The de
 Ships as 2 PRs: 9a, then 9b.
 
 **9a — CI**
-- [ ] `ci.yml` on every PR and push to `master`: frontend (`tsc`, `jest`, `expo lint`, web export), backend (`ruff`, `pytest` with a Postgres service container), Docker builds, Bicep lint; path filters; dependency caching
-- [ ] Branch protection on `master`: PR required, CI must pass, no direct pushes or force-pushes (a repo setting you turn on once 9a's checks exist; not code)
+- [x] `ci.yml` on every PR and push to `master`: frontend (`tsc`, `jest`, `expo lint`, web export), backend (`ruff`, `pytest` with a Postgres service container), Docker build (no push); path filters with one aggregate required check (`ci-ok`); dependency caching. (Bicep lint moved to 23a: there's no `infra/` yet.)
+- [x] Branch protection on `master`: PR required, CI must pass, no direct pushes or force-pushes (a ruleset kept in `.github/rulesets/master.json`, applied once 9a's checks exist)
+- [x] Branch cleanup: head branches deleted when a PR is merged (repo setting) or closed without merging (`cleanup-branch.yml`)
 
 **9b — Images, environments, releases**
 - [ ] GitHub environments `dev` and `production` (`production` requires your approval)
 - [ ] Images built once per commit, pushed to GHCR tagged with the commit SHA; prod reuses the same digest
 - [ ] Deploy workflows (`deploy.yml` reusable; `deploy-dev` on push to `master`; `deploy-prod` on release published), with no Azure steps until Phase 23
 - [ ] Release process: `v*` tags, generated release notes, rollback = redeploy the previous tag
-- [ ] Dependabot (npm, pip, GitHub Actions, Docker); CI status badge in the README
-- [ ] Update `CLAUDE.md`: branching/release flow, how to cut a release
+- [ ] Dependabot (npm, uv, GitHub Actions, Docker); minimal `README.md` with a CI status badge
+- [ ] Update `CLAUDE.md`: branching/release flow, how to cut a release; ADR 0006 (trunk-based + release tags, promote by digest)
 
 **Done when:** a PR shows green CI checks, merging is blocked when they fail, and every merge to `master` produces images in GHCR.
 
@@ -495,6 +496,7 @@ Ships as 3 PRs in order: 23a → 23b → 23c.
 - [ ] `infra/` Bicep modules: Container Apps environment + `api` app, Postgres server (shared) + per-environment database, Static Web App, storage account, Key Vault, Log Analytics + App Insights, user-assigned managed identity, RBAC role assignments; `dev.bicepparam` / `prod.bicepparam`
 - [ ] GitHub OIDC: federated credentials per environment; Azure IDs stored as environment variables, not secrets
 - [ ] `infra-whatif.yml` posts the planned infra changes on PRs
+- [ ] Bicep `build` + lint job in `ci.yml` (moved from 9a), path-filtered on `infra/**`
 - [ ] One-time bootstrap documented in `infra/README.md` (create resource groups + OIDC identities) — the only manual step
 
 **23b — API deploy**
