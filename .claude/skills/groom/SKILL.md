@@ -13,7 +13,7 @@ Input: `$ARGUMENTS`, which is a ROADMAP sub-step (`4a`), a phase (`Phase 4`), or
 
 ## Hard rule
 
-Read-only until the user approves the drafts. Don't run `gh issue create`, `gh issue edit`, `gh label create`, or any `gh api` write before that. The only file grooming writes is each created issue's `.claude-output/<issue#>-<slug>/issue.md` (step 4). Grooming doesn't edit ROADMAP.md either. ROADMAP changes ship in a PR (see step 4).
+Read-only on GitHub until the user approves the drafts. Don't run `gh issue create`, `gh issue edit`, `gh label create`, or any `gh api` write before that. The only files grooming writes are the drafts in `.claude-output/drafts/` (step 3) and, after creation, each issue's `.claude-output/<issue#>-<slug>/issue.md` (step 4). Grooming doesn't edit ROADMAP.md either. ROADMAP changes ship in a PR (see step 4).
 
 ## 1. Check what exists
 
@@ -36,7 +36,17 @@ gh issue list --state all --limit 50 --json number,title,state,labels
 
 Split the request into units of **one reviewable PR each**. Split when one part is a prerequisite for another, when parts need different review levels, or when one diff would be too big to review in one sitting. Prefer the ROADMAP's existing sub-step letters. If a phase has no sub-steps and needs a split, propose the letters (they get written into ROADMAP §6 by the first PR of that phase).
 
-Per issue, write a title and body in exactly this shape. The headings match `.github/ISSUE_TEMPLATE/feature.yml`, and `/work` parses them.
+Per issue, write a draft file `.claude-output/drafts/<step-or-short-slug>.md` (e.g. `drafts/4a.md`, `drafts/turn-queue-bug.md`; see [`.claude-output/README.md`](../../../.claude-output/README.md)). It starts with a 4-line header, the same shape as `issue.md` so step 4 can strip it with `tail -n +5`:
+
+```markdown
+# Draft: <title>
+
+Labels: <labels> · Blocked by: <step or #N> / none · Parent: #… / none
+
+<body>
+```
+
+The body has exactly this shape. The headings match `.github/ISSUE_TEMPLATE/feature.yml`, and `/work` parses them.
 
 ```markdown
 ### Context
@@ -79,16 +89,18 @@ AC quality bar. Every AC must be checkable by a test or by one concrete manual s
 - Phase: `phase:N` (create it if missing, see step 4)
 - `needs:design` (see 2.5)
 
-Show the user every draft in chat (title, labels, body), plus a one-line dependency graph, e.g. `#A 4a → #B 4b, #C 4c`. Then list open questions. If an open question changes the scope, ask it with AskUserQuestion before finalizing. Wait for approval or edits.
+Write every draft file **before** asking for approval. In chat, don't repeat the bodies. Per draft, show its path, title, labels, a one-line scope summary and the AC count, plus a one-line dependency graph, e.g. `4a → 4b, 4c`. The user reads and edits the files in their editor (or points another session at them). Then list open questions. If an open question changes the scope, ask it with AskUserQuestion before finalizing. Wait for approval or edits. When the user asks for changes, edit the draft files and show the summary again. If the user has edited a file themselves, reread it before creating.
 
 ## 4. Create (after approval only)
 
-Write each body to the session scratchpad, then:
+Create the issues in dependency order (blockers first), straight from the draft files. `tail -n +5` strips the 4-line header, and `--body-file -` reads the body from stdin:
 
 ```bash
 gh label create "phase:N" --color BFD4F2 --description "ROADMAP phase N" 2>/dev/null || true
-gh issue create --title "<Na: title>" --body-file <scratchpad>/issue-Na.md --label "enhancement,review:diff,area:backend,phase:N"
+tail -n +5 .claude-output/drafts/4a.md | gh issue create --title "<Na: title>" --body-file - --label "enhancement,review:diff,area:backend,phase:N"
 ```
+
+Once an issue is created, replace `Blocked by: <step>` (e.g. `Blocked by: 4a`) with its `#N` in the header and body of the drafts not yet created, so later bodies link the real issue.
 
 Title format: `<sub-step>: <imperative summary>` for ROADMAP work (`4a: Add pytest suite and ruff config`); just the summary for ad-hoc issues.
 
@@ -104,7 +116,7 @@ gh api -X POST repos/{owner}/{repo}/issues/<parent#>/sub_issues -F sub_issue_id=
 
 If a link call fails, keep the `Blocked by: #N` line in the body (it's always there anyway) and report the failure. Don't retry in a loop.
 
-**Save each created issue** to `.claude-output/<issue#>-<slug>/issue.md`. `<slug>` is the short kebab-case slug `/work` will use for the branch (`<type>/<issue#>-<slug>`), so the folders match; see [`.claude-output/README.md`](../../../.claude-output/README.md). File contents:
+**Move each created draft** to `.claude-output/<issue#>-<slug>/issue.md`, then delete it from `drafts/`. `<slug>` is the short kebab-case slug `/work` will use for the branch (`<type>/<issue#>-<slug>`), so the folders match; see [`.claude-output/README.md`](../../../.claude-output/README.md). File contents:
 
 ```markdown
 # Issue: #<n> <title>
@@ -113,6 +125,8 @@ If a link call fails, keep the `Blocked by: #N` line in the body (it's always th
 
 <the body exactly as created>
 ```
+
+That's the draft with its header swapped: line 1 becomes `# Issue: #<n> <title>` and line 3 gains the URL. When every draft is created, `drafts/` holds nothing from this run. A draft the user drops stays there only if they ask to keep it.
 
 The folder is gitignored (local only), so it doesn't matter which branch you're on. If a body is edited later (a refinement or a scope change), update its `issue.md` too.
 
