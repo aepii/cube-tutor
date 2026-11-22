@@ -23,7 +23,7 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 2. `/work <issue#>`: load the issue + comments + links, branch `<type>/<#>-<slug>` from `master`, plan (user approves), build, `/verify`, hand off a manual test list mapped to the AC. No commit.
 3. The user tests by hand, then `/pr` (`Closes #N`, AC checklist, ROADMAP ticks).
 
-- **Outputs:** each step saves its artifact to `.claude-output/<issue#>-<slug>/` (`issue.md`, `plan.md`, `implementation.md`, `pr.md`). The folder is gitignored (local only) except its README. Learning guides are in `.claude-output/guides/`. See [`.claude-output/README.md`](.claude-output/README.md).
+- **Outputs:** each step saves its artifacts to `.claude-output/<issue#>-<slug>/` (`issue.md`, `plan.md`, `your-turn.md`, `deviation.md`, `implementation.md`, `pr.md`, `commit.md`). `/groom` drafts go to `.claude-output/drafts/` until the issue exists. Drafts are written to files before approval, and the chat shows a summary plus the path. The folder is gitignored (local only) except its README. Learning guides are in `.claude-output/guides/`. See [`.claude-output/README.md`](.claude-output/README.md).
 - **Definition of Ready:** the issue has testable AC, a test plan, no open blockers, and no unanswered open questions. Otherwise refine it with `/groom` before `/work`.
 - **Definition of Done:** every AC met or changed by agreement (recorded as an issue comment, with the body edited to match), `/verify` passes, docs updated, ROADMAP §6 ticked, and the user tested it by hand.
 - **Scope changes** go to the issue (comment + body edit), not just chat. Out-of-scope findings become proposed follow-up issues, not drive-by fixes.
