@@ -25,6 +25,16 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 - **Scope changes** go to the issue (comment + body edit), not just chat. Out-of-scope findings become proposed follow-up issues, not drive-by fixes.
 - Labels: type (`enhancement`, `bug`, `chore`, `spike`, `documentation`), `review:closely` / `review:diff`, `area:*`, `phase:N`, `needs:design` (UI work before `docs/ui.md` exists).
 
+## Branching and releases
+
+Trunk-based ([ADR 0006](docs/decisions/0006-trunk-based-release-tags.md); details in `docs/ci-cd.md`):
+
+- **Merging:** feature branch → PR → `master`. `master` is protected: changes arrive only through a PR, the `ci-ok` check must pass, and force-pushes are blocked. The branch is deleted when the PR closes.
+- **Dev deploys:** every merge to `master` builds the backend image once (`ghcr.io/aepii/cubetutor-backend:<sha>`) and deploys it to `dev`.
+- **Releasing:** publish a GitHub Release with a new `vX.Y.Z` tag on `master` and click *Generate release notes*. `deploy-prod` then promotes that commit's image digest to `production`, after the owner approves. Nothing is rebuilt.
+- **Rolling back:** re-run the previous release's `Deploy production` run.
+- **No `prod` or release branches.** Don't push or tag from a feature branch.
+
 ## Layout
 
 | Path | What |
@@ -52,8 +62,8 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 - `docs/rendering.md`: R3F setup, fiber split, demand frameloop, gestures and turn animation. Before touching cube components, input, or `render/`.
 - `docs/backend.md`: tables, auth flow, endpoint list, migration status. Before touching `backend/` or frontend API/auth code.
 - `docs/data-pipeline.md`: scraper, raw JSON shape, seeding, Celery. Before touching `scraper/`, `shared/data/`, `backend/app/worker/`, or the seed.
-- `docs/ci-cd.md`: GitHub Actions (`ci.yml` jobs, path filters, the `ci-ok` required check), `master` ruleset, branch cleanup. Before touching `.github/`.
-- `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, or Celery.
+- `docs/ci-cd.md`: GitHub Actions (CI and the `ci-ok` check, image build, deploy workflows), `master` ruleset, environments, releases and rollback, Dependabot. Before touching `.github/` or cutting a release.
+- `docs/decisions/`: ADRs. When a change would revisit Expo, Zustand, the sticker model, Celery, or the branching/release flow.
 
 ## Running
 

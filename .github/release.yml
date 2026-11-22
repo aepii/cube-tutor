@@ -1,0 +1,16 @@
+# Categories for "Generate release notes" (and the API). PRs are grouped by
+# label; the first matching category wins. See docs/ci-cd.md#releases.
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement]
+    - title: Bug fixes
+      labels: [bug]
+    - title: Maintenance
+      labels: [chore]
+    - title: Documentation
+      labels: [documentation]
+    - title: Dependencies
+      labels: [dependencies] # added by Dependabot
+    - title: Other changes
+      labels: ["*"]

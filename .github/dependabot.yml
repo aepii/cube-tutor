@@ -1,0 +1,59 @@
+# Weekly dependency PRs; minor + patch grouped per ecosystem, majors one PR each.
+# Each PR goes through ci.yml and the master ruleset like any other.
+# See docs/ci-cd.md#dependabot for why each ignore exists.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    # Expo pins these to versions that match the SDK. Upgrade them with the SDK
+    # (`npx expo install expo@<sdk> && npx expo install --fix`), not one by one.
+    ignore:
+      - dependency-name: expo
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: jest-expo
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: react-native
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      uv-minor-patch:
+        update-types: [minor, patch]
+    # Deliberate caps, explained in backend/pyproject.toml.
+    ignore:
+      - dependency-name: sqlalchemy
+        versions: [">=2.1"]
+      - dependency-name: bcrypt
+        versions: [">=5"]
+      - dependency-name: sqlmodel
+        versions: [">=0.0.32"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    ignore:
+      # The project requires Python <3.13 (backend/pyproject.toml).
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]
