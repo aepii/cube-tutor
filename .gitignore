@@ -2,3 +2,7 @@
 .vscode
 .aiexclude
 .claude/worktrees/
+
+# Claude outputs (plans, handoffs, PR drafts, guides): local only. The README (conventions) is tracked.
+.claude-output/*
+!.claude-output/README.md

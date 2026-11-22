@@ -13,7 +13,7 @@ Input: `$ARGUMENTS`, which is a ROADMAP sub-step (`4a`), a phase (`Phase 4`), or
 
 ## Hard rule
 
-Read-only until the user approves the drafts. Don't run `gh issue create`, `gh issue edit`, `gh label create`, or any `gh api` write before that. Grooming doesn't edit ROADMAP.md either. ROADMAP changes ship in a PR (see step 4).
+Read-only until the user approves the drafts. Don't run `gh issue create`, `gh issue edit`, `gh label create`, or any `gh api` write before that. The only file grooming writes is each created issue's `.claude-output/<issue#>-<slug>/issue.md` (step 4). Grooming doesn't edit ROADMAP.md either. ROADMAP changes ship in a PR (see step 4).
 
 ## 1. Check what exists
 
@@ -103,6 +103,18 @@ gh api -X POST repos/{owner}/{repo}/issues/<parent#>/sub_issues -F sub_issue_id=
 ```
 
 If a link call fails, keep the `Blocked by: #N` line in the body (it's always there anyway) and report the failure. Don't retry in a loop.
+
+**Save each created issue** to `.claude-output/<issue#>-<slug>/issue.md`. `<slug>` is the short kebab-case slug `/work` will use for the branch (`<type>/<issue#>-<slug>`), so the folders match; see [`.claude-output/README.md`](../../../.claude-output/README.md). File contents:
+
+```markdown
+# Issue: #<n> <title>
+
+<URL> · Labels: <labels> · Blocked by: #… / none · Parent: #… / none
+
+<the body exactly as created>
+```
+
+The folder is gitignored (local only), so it doesn't matter which branch you're on. If a body is edited later (a refinement or a scope change), update its `issue.md` too.
 
 Only create a parent "Phase N" tracking issue if the user asks for one. Usually the `phase:N` label is enough.
 
