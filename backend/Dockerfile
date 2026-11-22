@@ -1,11 +1,10 @@
 # syntax=docker/dockerfile:1
-# One image for the API, the Celery worker and the migrate job (ADR 0005).
+# One image for the API and the migrate job (ADR 0005).
 # Build context is the repo root, so the seed data in shared/data/raw is in reach:
 #   docker build -f backend/Dockerfile -t cubetutor-backend .
 # Commands:
 #   (default)  uvicorn app.main:app      host/port/workers from UVICORN_* env
 #   migrate    sh -c "alembic upgrade head && python -m seed.seed_algorithms"
-#   worker     celery -A app.worker.celery_app worker --loglevel=info
 
 ARG PYTHON_IMAGE=python:3.12-slim
 

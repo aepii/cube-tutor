@@ -22,10 +22,6 @@ class Settings(BaseSettings):
     # Env: comma-separated (`http://a,http://b`) or a JSON list (`["http://a"]`).
     CORS_ORIGINS: Annotated[list[str], NoDecode] = []
 
-    # Celery (Redis today)
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
-
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def _parse_origins(cls, value):

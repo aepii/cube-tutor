@@ -9,15 +9,15 @@ How CubeTutor fits together **as the code stands today**. Planned work lives in 
 | App | Expo SDK 58 (React Native 0.88 + react-native-web), expo-router, Zustand, react-three-fiber, axios | [`frontend/`](../frontend/) | `npm run web` (:8081) or Expo Go |
 | API | FastAPI + SQLModel, JWT auth (PyJWT, passlib/bcrypt) | [`backend/app/`](../backend/app/) | `backend` container, uvicorn :8000 |
 | Database | Postgres 18 | — | `postgres` container (host :5433) |
-| Queue | Redis 8.4 (Celery broker on db 0, result backend on db 1) | [`backend/app/worker/celery_app.py`](../backend/app/worker/celery_app.py) | `redis` container (host :6380) |
-| Worker | Celery 5.6 | [`backend/app/worker/tasks.py`](../backend/app/worker/tasks.py) | `celery` container (backend image) |
 | Migrate + seed | Alembic + [`seed/seed_algorithms.py`](../backend/seed/seed_algorithms.py) | [`backend/`](../backend/) | `migrate` container: one-shot, on every `up` |
 | Scraper | requests + BeautifulSoup | [`scraper/`](../scraper/) | Run by hand, once; not in Compose |
 | Admin | pgAdmin 4 | — | `pgadmin` container (:5050) |
 
 Services and ports: [`docker-compose.yml`](../docker-compose.yml), env vars in [`.template.env`](../.template.env).
 
-**One image, three commands** ([ADR 0005](decisions/0005-one-python-package-uv.md)). [`backend/Dockerfile`](../backend/Dockerfile) builds one image from the repo root (it copies `shared/data/raw` for the seed). It runs as `migrate` (`alembic upgrade head && python -m seed.seed_algorithms`), `backend` (uvicorn) and `celery` (`celery -A app.worker.celery_app worker`). `backend` and `celery` start only after `migrate` exits 0. The image needs only env vars, no bind mounts. In Compose, `backend` alone also mounts `./backend:/app` and runs uvicorn with `--reload` for development. Dependencies: [`backend/pyproject.toml`](../backend/pyproject.toml) + `uv.lock`.
+There are **no background jobs** today. The Celery + Redis placeholder was removed in #39 ([ADR 0004](decisions/0004-celery-redis-worker.md), superseded). A Service Bus queue and worker come with Phase 24 (ROADMAP §3.10).
+
+**One image, two commands** ([ADR 0005](decisions/0005-one-python-package-uv.md)). [`backend/Dockerfile`](../backend/Dockerfile) builds one image from the repo root (it copies `shared/data/raw` for the seed). It runs as `migrate` (`alembic upgrade head && python -m seed.seed_algorithms`) and `backend` (uvicorn). `backend` starts only after `migrate` exits 0. The image needs only env vars, no bind mounts. In Compose, `backend` alone also mounts `./backend:/app` and runs uvicorn with `--reload` for development. Dependencies: [`backend/pyproject.toml`](../backend/pyproject.toml) + `uv.lock`.
 
 ## Data flow: scrape → app
 
@@ -33,8 +33,6 @@ flowchart LR
 
     APP2["App: Playground"] --- ENGINE["Cube engine<br/>(client-only)"]
 
-    API -->|"process_image.delay()"| REDIS[("Redis")]
-    REDIS --> WORKER["Celery worker<br/>process_image (placeholder)"]
 ```
 
 1. **Scrape.** [`scraper/main.py`](../scraper/main.py) fetches the F2L, OLL and PLL pages and writes one JSON file per subset into `shared/data/raw/`. See [data-pipeline.md](data-pipeline.md).
@@ -44,8 +42,6 @@ flowchart LR
 5. **Test.** The engine's Jest tests read the same raw JSON directly and check that every scraped solution solves its setup. See [cube-engine.md](cube-engine.md#how-the-tests-pin-the-conventions).
 
 The **3D cube (Playground)** is entirely client-side. It doesn't call the API. See [cube-engine.md](cube-engine.md) and [rendering.md](rendering.md).
-
-The **Redis/Celery path** is a placeholder. `POST /v1/images/upload` enqueues a fake task. See [data-pipeline.md](data-pipeline.md#celery-tasks).
 
 ## Frontend structure
 

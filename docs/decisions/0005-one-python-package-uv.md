@@ -2,6 +2,8 @@
 
 **Status:** accepted (4c, issue #18). Amends [0004](0004-celery-redis-worker.md): Celery stays, but its code no longer lives in a bind-mounted `shared/` folder.
 
+**Update (#39):** Celery and `app/worker/` were removed, so the image now runs two commands (`migrate`, `backend`). The one-package, one-image decision stands for the Phase 24 Service Bus worker, which will be a third command on the same image.
+
 **Evidence:** ROADMAP §4.1 #6 (backend image broken without the bind mount), §4.2 (one package; UTF-16 `pip freeze` files), §3.11 (a migration job runs before each rollout).
 
 ## Context

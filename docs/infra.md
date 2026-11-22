@@ -86,4 +86,3 @@ Target: ≈$0–2/month in year one (ROADMAP §3.12).
 - **Postgres is reachable from any Azure IP** (the 0.0.0.0 "allow Azure services" rule). Any tenant's Azure resources can reach the port, so the password is the only barrier. The production answer is a VNet-integrated Container Apps environment plus private access for Postgres. That costs money, so it isn't planned.
 - Key Vault and storage also have public network access, with authentication through Entra ID only.
 - Key Vault purge protection is off, so teardown and re-create work. Turn it on for real data. It can't be turned off again.
-- The real `api` image won't start on Azure yet: `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` are required in `backend/app/core/settings.py`, and there's no Redis on Azure. 23b must make them optional until Phase 24 removes Celery.
