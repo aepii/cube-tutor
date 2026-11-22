@@ -7,6 +7,8 @@
 #   2. run the migration job and wait for it (api unchanged if it fails)
 #   3. Bicep again: api gets the new image
 #   4. smoke test /health/ready on the new revision
+#   5. build the web app against this environment's API URL, upload it to the
+#      Static Web App's production environment, smoke test the site
 # The callers must grant `id-token: write` to the job that calls this file.
 # See docs/ci-cd.md and docs/infra.md.
 name: Deploy
@@ -111,6 +113,8 @@ jobs:
             echo "api_url=$(jq -r .apiUrl.value <<<"$outputs")"
             echo "api_app=$(jq -r .apiAppName.value <<<"$outputs")"
             echo "job=$(jq -r .migrateJobName.value <<<"$outputs")"
+            echo "swa_name=$(jq -r .staticWebAppName.value <<<"$outputs")"
+            echo "web_url=https://$(jq -r .staticWebAppHost.value <<<"$outputs")"
           } >> "$GITHUB_OUTPUT"
       - name: "2. run the migration job and wait for it"
         id: migrate
@@ -169,6 +173,59 @@ jobs:
             sleep "$delay"
             delay=$(( delay * 2 > 30 ? 30 : delay * 2 ))
           done
+      # ---- Web app (after the API is healthy, so the new site never calls an old API)
+      # Expo inlines EXPO_PUBLIC_* at build time, so each environment gets its own
+      # build of the deployed commit (same commit + lockfile as the image). The one
+      # exception to "nothing rebuilt" (docs/ci-cd.md).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: "5. web: build against this environment's API"
+        working-directory: frontend
+        env:
+          EXPO_PUBLIC_API_URL: ${{ steps.bicep1.outputs.api_url }}
+          EXPO_NO_TELEMETRY: '1'
+        run: |
+          npm ci
+          npx expo export --platform web --output-dir dist
+          test -f dist/staticwebapp.config.json
+      - name: "6. web: upload to the Static Web App (production environment)"
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          SWA_NAME: ${{ steps.bicep1.outputs.swa_name }}
+        run: |
+          # Deployment token read with the deploy identity's Contributor role:
+          # nothing is stored in GitHub. Masked before anything can print it.
+          token=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" \
+            --query properties.apiKey --output tsv)
+          echo "::add-mask::$token"
+          # `--env production` explicitly: the deploy action would infer it from
+          # the triggering event (push / release), the CLI doesn't guess.
+          SWA_CLI_DEPLOYMENT_TOKEN="$token" npx --yes @azure/static-web-apps-cli@2.1.0 deploy \
+            --output-location frontend/dist --swa-config-location frontend/dist --env production
+      - name: "7. web: smoke test"
+        id: web
+        env:
+          WEB_URL: ${{ steps.bicep1.outputs.web_url }}
+        run: |
+          # The root, and a deep route that only works through navigationFallback
+          # or the static route file. A new upload can take a moment to go live.
+          for path in / /learn; do
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 15 "$WEB_URL$path" || true)
+              echo "GET $WEB_URL$path -> $code"
+              [ "$code" = "200" ] && break
+              sleep 10
+            done
+            if [ "$code" != "200" ]; then
+              echo "status=$code on $path" >> "$GITHUB_OUTPUT"
+              echo "::error::$WEB_URL$path returned $code"
+              exit 1
+            fi
+          done
+          echo "status=200" >> "$GITHUB_OUTPUT"
       - name: summary
         if: always()
         env:
@@ -180,6 +237,8 @@ jobs:
           MIGRATE: ${{ steps.migrate.outcome }}
           ROLLOUT: ${{ steps.bicep2.outcome }}
           READY: ${{ steps.smoke.outputs.status }}
+          WEB_URL: ${{ steps.bicep1.outputs.web_url }}
+          WEB: ${{ steps.web.outputs.status }}
         run: |
           {
             echo "### Deploy to \`$ENVIRONMENT\`"
@@ -192,4 +251,6 @@ jobs:
             echo "| api rollout | $ROLLOUT |"
             echo "| API | ${API_URL:-unknown} |"
             echo "| \`/health/ready\` | ${READY:-not checked} |"
+            echo "| Web | ${WEB_URL:-unknown} |"
+            echo "| Web smoke test (\`/\`, \`/learn\`) | ${WEB:-not checked} |"
           } >> "$GITHUB_STEP_SUMMARY"

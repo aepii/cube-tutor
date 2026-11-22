@@ -6,6 +6,7 @@ Unversioned and unauthenticated. `live` says the process is serving requests;
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
@@ -33,8 +34,10 @@ def live():
 
 @router.get("/ready")
 def ready(engine: Engine = Depends(get_probe_engine)):
+    # No SQL dependency span for the probe: the request itself is excluded from
+    # tracing, so the span would be an orphan sent every 10 s (ingestion cap).
     try:
-        with engine.connect() as conn:
+        with suppress_instrumentation(), engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except SQLAlchemyError:
         return JSONResponse(status_code=503, content={"status": "unavailable"})

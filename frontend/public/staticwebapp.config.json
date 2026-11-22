@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/_expo/*", "/assets/*", "*.{js,css,map,json,png,jpg,jpeg,gif,svg,ico,ttf,otf,woff,woff2,txt}"]
+  }
+}

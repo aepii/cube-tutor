@@ -35,3 +35,6 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 
 output workspaceName string = workspace.name
 output appInsightsName string = appInsights.name
+// Not a secret (Microsoft: it only identifies where to send telemetry), so it's
+// passed to the api as a plain env var. Not a main.bicep output.
+output connectionString string = appInsights.properties.ConnectionString

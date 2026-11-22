@@ -132,7 +132,15 @@ Expected:
 
 ### 6. Create the app database users and secrets (once per environment)
 
-Do this for **dev before the first merge that deploys the API** (23b), and for **prod before the first release**. While a secret is missing, `deploy.yml` fails at its first Bicep step: Container Apps resolves Key Vault references when it deploys.
+Do this once per environment. While a secret is missing, `deploy.yml` fails at its first Bicep step: Container Apps resolves Key Vault references when it deploys.
+
+The script needs the environment's Key Vault, and only `main.bicep` creates it (the bootstrap doesn't). On a fresh environment, the first deploy creates the vault and then fails. So the order is:
+
+1. **Deploy once and let it fail.** Dev: merge to `master`. Prod: publish the first release and approve it. The `Deploy` run fails at "1. Bicep" with a missing-secret error on the `api` app. The vault exists by then, because the Key Vault module deploys before Container Apps.
+2. **Run the script below** with `E=dev` or `E=prod`. Check the vault exists first: `az keyvault list -g rg-cubetutor-$E -o table`.
+3. **Re-run the failed run** (Actions → the run → *Re-run all jobs*). For prod, the re-run needs approval again.
+
+If the environment already has its secrets (for example after its Container Apps environment was recreated), skip this step.
 
 Each environment gets its own Postgres role, which owns only its own database, so the admin login stays out of the app. By default Postgres lets `PUBLIC` connect to every database, so the SQL revokes that on both databases. The dev role can't even connect to `cubetutor_prod`, and the reverse.
 

@@ -2,3 +2,6 @@
 using 'main.bicep'
 
 param environmentName = 'dev'
+
+// PR preview sites (web-preview.yml) call the dev API; prod keeps its exact origin.
+param allowPreviewOrigins = true

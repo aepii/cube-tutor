@@ -5,6 +5,7 @@ GitHub Actions workflows live in [`.github/workflows/`](../.github/workflows/). 
 - images, environments, deploy workflows, releases and Dependabot (9b)
 - Azure login and Bicep provisioning in `deploy.yml`, the `infra` CI job, and the `infra-whatif.yml` PR preview (23a; the infrastructure itself is in [infra.md](infra.md))
 - the API rollout in `deploy.yml`: migration job, then the image, then a smoke test (23b)
+- the web build and upload to Static Web Apps in `deploy.yml`, and PR preview sites in `web-preview.yml` (23c)
 
 ```mermaid
 flowchart LR
@@ -109,7 +110,16 @@ A reusable workflow with two inputs: `environment` and `image`. It runs in that 
 5. **Migrate:** [`infra/scripts/run-migration.sh`](../infra/scripts/run-migration.sh) starts the job, polls the execution until `Succeeded`, and gives up after 15 minutes. On `Failed`, `Stopped`, `Degraded` or a timeout, it prints the execution's logs (from Log Analytics, which can lag by a minute or two) and fails the step. The run stops there with `api` untouched.
 6. **Bicep, pass 2:** the same deployment with the new digest on `api` too. A new revision takes traffic once its probes pass.
 7. **Smoke test:** polls until the latest revision runs the digest, is the latest ready revision, and `GET <api url>/health/ready` returns 200. Back-off 5 → 10 → 20 → 30 s for up to ~3 minutes (cold start from 0 replicas); otherwise the run fails.
-8. **Summary** (always, even after a failure): image digest, migration execution name and result, rollout result, API URL, `/health/ready` status.
+8. **Web build:** Node from `.nvmrc`, `npm ci`, then `npx expo export --platform web` in `frontend/`, with `EXPO_PUBLIC_API_URL` set to the API URL from the Bicep output. It fails if `dist/staticwebapp.config.json` is missing.
+9. **Web upload:** reads the Static Web App's deployment token with `az staticwebapp secrets list` (the deploy identity's Contributor role; nothing stored in GitHub) and masks it. Then the SWA CLI (`@azure/static-web-apps-cli`, pinned) uploads `frontend/dist` with `--env production`. The CLI, not the deploy action, because the action decides between preview and production from the triggering event (`push`, `release`), and the CLI takes the target explicitly.
+10. **Web smoke test:** `GET /` and `GET /learn` on the site must return 200 (6 tries, 10 s apart).
+11. **Summary** (always, even after a failure): image digest, migration execution name and result, rollout result, API URL, `/health/ready` status, web URL and web smoke test.
+
+The web steps run after the API is healthy, so a new site never calls an older API. If the web part fails, the API is already rolled out; re-running the run is safe (the Bicep passes and the migration are idempotent).
+
+**Why the web app is built per environment** (the one exception to "nothing rebuilt", [ADR 0006](decisions/0006-trunk-based-release-tags.md)). Expo inlines `EXPO_PUBLIC_*` into the bundle at build time, so the API URL can't be swapped after the build. Each environment's build comes from the same commit and the same `package-lock.json` as the image it ships with, so prod's web build can be reproduced from the release tag. A single build plus a runtime config file (`/config.json` fetched at startup) would remove the exception. That's out of scope until the per-environment build causes a problem.
+
+**Deep links:** [`frontend/public/staticwebapp.config.json`](../frontend/public/staticwebapp.config.json) (Expo copies `public/` into `dist/`) sets `navigationFallback` to `/index.html`, excluding `/_expo/*`, `/assets/*` and static file extensions. A refresh on a client-side route serves the app instead of a 404, and expo-router renders the route from the URL. Tokens are in `localStorage`, so a reload keeps the session.
 
 Why this order and the migration rule it implies: [infra.md § How it's deployed](infra.md#how-its-deployed). The workflow runs with `shell: bash` (pipefail) and lets the Azure CLI install extensions without prompting.
 
@@ -134,6 +144,22 @@ On PRs that touch `infra/**` (or this workflow), it logs in as the **dev** deplo
 - PRs from forks are skipped (they get no OIDC token and no write token).
 - It isn't a required check; the `infra` job in `ci.yml` is the gate. A failed what-if still fails this workflow and says so in the comment.
 - Permissions: `contents: read`, `id-token: write`, `pull-requests: write`, on that one job.
+
+## Web previews (`web-preview.yml`)
+
+On PRs from this repo that touch `frontend/**`, `shared/**`, `.nvmrc` or the workflow itself, on `opened` / `synchronize` / `reopened` / `closed`:
+
+1. Logs in as the **dev** deploy identity (repository variable `AZURE_WHATIF_CLIENT_ID`, the same `pull_request` federated credential as the what-if).
+2. Reads the `swa-cubetutor-dev` deployment token (masked) and the dev API URL (`az containerapp show`, so it's never hardcoded).
+3. Builds the web app with `EXPO_PUBLIC_API_URL=<dev API>` and deploys it with [`Azure/static-web-apps-deploy`](https://github.com/Azure/static-web-apps-deploy) (`action: upload`, `skip_app_build`). On a `pull_request` event the action creates the preview environment named after the PR number: `https://<sub>-<PR#>.<region>.<rest>`. The dev API allows that origin through `CORS_ORIGIN_REGEX` ([infra.md](infra.md#secrets)), so login works there.
+4. Posts the URL as **one** PR comment and updates it on later pushes (hidden `<!-- web-preview -->` marker, same `gh api` code as the what-if).
+5. On `closed` it skips the build and runs the action with `action: close`, which deletes the preview environment, then updates the comment to say so.
+
+- **`pull_request`, never `pull_request_target`:** the PR's code runs with the PR's own token, and PRs from forks are skipped (no OIDC token, read-only token). Permissions: `contents: read`, `id-token: write`, `pull-requests: write`, on that one job.
+- **SWA Free allows 3 preview environments;** a deploy beyond that fails. Deleting on close keeps the count down. To list or clean up by hand: `az staticwebapp environment list -n swa-cubetutor-dev -o table`, `az staticwebapp environment delete -n swa-cubetutor-dev --environment-name <PR#>`.
+- Previews share the dev database with the dev site, so accounts made on a preview exist on dev too.
+- The action is pinned to the head of its `v1` **branch**. The repo also has an old 2021 `v1` tag; the branch is what Microsoft maintains. The action runs a Docker image Microsoft publishes (`mcr.microsoft.com/appsvc/staticappsclient:stable`), which can't be pinned from here.
+- Not a required check: `ci-ok` stays the gate.
 
 ## Releases (`deploy-prod.yml`)
 

@@ -17,9 +17,35 @@ param keyVaultUri string
 @description('CORS_ORIGINS for the API (comma-separated).')
 param corsOrigins string
 
+@description('CORS_ORIGIN_REGEX for the API (dev: the Static Web App PR preview hosts). Empty = not set.')
+param corsOriginRegex string = ''
+
+@description('App Insights connection string; the api sends OpenTelemetry to it.')
+param appInsightsConnectionString string
+
+@description('Fraction of traces kept (0-1), as a string (Bicep has no decimals).')
+param tracesSampleRatio string
+
 param tags object
 
 var port = isBackendImage ? 8000 : 80
+
+// Plain env vars (secrets are the Key Vault references below). OTEL_* are read
+// by the Azure Monitor distro (backend/app/core/telemetry.py): the service name
+// is the cloud role name in App Insights; fixed-percentage sampling replaces the
+// distro's default rate limiter.
+var apiEnv = concat(
+  [
+    { name: 'DATABASE_URL', secretRef: 'database-url' }
+    { name: 'SECRET_KEY', secretRef: 'secret-key' }
+    { name: 'CORS_ORIGINS', value: corsOrigins }
+    { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+    { name: 'OTEL_SERVICE_NAME', value: 'cubetutor-api' }
+    { name: 'OTEL_TRACES_SAMPLER', value: 'microsoft.fixed_percentage' }
+    { name: 'OTEL_TRACES_SAMPLER_ARG', value: tracesSampleRatio }
+  ],
+  empty(corsOriginRegex) ? [] : [{ name: 'CORS_ORIGIN_REGEX', value: corsOriginRegex }]
+)
 
 // Key Vault references: Container Apps fetches the secret as the api identity
 // (Key Vault Secrets User on the vault). Versionless URLs: a new secret version
@@ -80,6 +106,10 @@ resource env 'Microsoft.App/managedEnvironments@2026-07-01' = {
         sharedKey: workspace.listKeys().primarySharedKey
       }
     }
+    // Explicit: from API 2026-07-01 an environment created without a mode is
+    // `Express`, which rejects Key Vault secret references
+    // (ExpressKeyVaultSecretsNotSupported). Set at creation; see docs/infra.md.
+    environmentMode: 'WorkloadProfiles'
     workloadProfiles: [
       {
         name: 'Consumption'
@@ -121,11 +151,7 @@ resource api 'Microsoft.App/containerApps@2026-07-01' = {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
-          env: [
-            { name: 'DATABASE_URL', secretRef: 'database-url' }
-            { name: 'SECRET_KEY', secretRef: 'secret-key' }
-            { name: 'CORS_ORIGINS', value: corsOrigins }
-          ]
+          env: apiEnv
           probes: isBackendImage ? probes : []
         }
       ]

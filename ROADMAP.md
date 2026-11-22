@@ -504,9 +504,9 @@ Ships as 3 PRs in order: 23a → 23b → 23c.
 - [x] `api`: health probes, scale 0..N on HTTP traffic, secrets from Key Vault via the managed identity, CORS for the Static Web Apps domain
 
 **23c — Web deploy + telemetry** **[review diff]**
-- [ ] Web build on Static Web Apps (dev + prod); `EXPO_PUBLIC_API_URL` per environment; PR preview environments pointed at the dev API
-- [ ] App Insights basics: the OpenTelemetry distro in the API (requests, dependencies, exceptions)
-- [ ] README: architecture diagram, live dev/prod URLs
+- [x] Web build on Static Web Apps (dev + prod); `EXPO_PUBLIC_API_URL` per environment; PR preview environments pointed at the dev API
+- [x] App Insights basics: the OpenTelemetry distro in the API (requests, dependencies, exceptions)
+- [x] README: architecture diagram, live dev/prod URLs
 
 **Done when:** merging a PR deploys the API and web app to dev with no manual steps; publishing a release (after your approval) deploys the same images to prod; you can log in on both; the budget alert exists.
 
