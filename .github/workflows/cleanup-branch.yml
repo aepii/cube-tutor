@@ -1,0 +1,37 @@
+# Deletes the head branch of a PR that was closed WITHOUT merging. Merged PRs
+# are covered by the repo setting "Automatically delete head branches".
+# See docs/ci-cd.md. A deleted branch can be restored from the PR page.
+name: Cleanup branch
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  delete-head-branch:
+    name: delete head branch
+    # Same-repo branches only (fork PRs get a read-only token anyway), never master.
+    if: >-
+      github.event.pull_request.merged == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref != 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: delete branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # Passed via env so the branch name is never interpolated into the script.
+          REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if out=$(gh api -X DELETE "repos/$REPO/git/refs/heads/$REF" 2>&1); then
+            echo "Deleted $REF"
+          elif echo "$out" | grep -q "HTTP 422\|HTTP 404\|Reference does not exist"; then
+            echo "$REF is already gone"
+          else
+            echo "$out"
+            exit 1
+          fi
