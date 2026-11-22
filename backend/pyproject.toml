@@ -21,7 +21,7 @@ dependencies = [
     "sqlalchemy>=2.0.45,<2.1",
     # Newer sqlmodel maps datetime to UTCDateTime, a schema change that needs its own migration.
     "sqlmodel>=0.0.31,<0.0.32",
-    "uvicorn[standard]>=0.40.0",
+    "uvicorn[standard]>=0.54.0",
     "azure-monitor-opentelemetry>=1.8.12",
     "opentelemetry-instrumentation>=0.66b2",
 ]
