@@ -1,6 +1,6 @@
 ---
 name: work
-description: Implement one GitHub issue end to end. Pulls the issue with comments, parent and blocked-by links, branches from master, gets the plan approved, builds it, runs /verify, then stops with a manual test checklist mapped to the acceptance criteria. Never commits.
+description: Take one GitHub issue to a tested change. Pulls the issue with comments, parent and blocked-by links, branches from master, gets the plan approved (with [yours] / [Claude] ownership), builds Claude's part plus failing tests for the user's part, reviews the user's code, runs /verify, then stops with a manual test checklist mapped to the acceptance criteria. Never commits.
 disable-model-invocation: true
 argument-hint: "<issue number>"
 ---
@@ -12,6 +12,7 @@ Input: `$ARGUMENTS` = an issue number (`#` optional). If it's missing, run `gh i
 ## Hard rules
 
 - **Never commit, push, or open a PR.** This skill ends at a verified working tree plus a test checklist. The user tests by hand, then runs `/pr`.
+- **Don't write the user's code.** Pieces tagged **[yours]** in the approved plan are the user's to write (root CLAUDE.md, "Working with the user"). Claude writes their failing tests, signatures, and wiring, and then reviews. If the user is stuck, escalate one step at a time: a hint, then a pointer to the exact docs section, then a slightly bigger example of the pattern. Write the real code only if the user asks for it.
 - **The issue's AC define done.** Don't add scope. Note anything out of scope for a follow-up issue instead (see step 6).
 - Writes to GitHub (comments, body edits) happen only in step 6, and only after the user agrees to the change.
 
@@ -62,6 +63,12 @@ Enter plan mode (EnterPlanMode) and present:
 3. **Tests first:** for logic (engine, parser, store, auth, SQL, stats), write the failing test before the code.
 4. **Deviations:** anything in the issue that's wrong, stale, or needs an AC change. Give a recommendation, not a survey.
 5. **Review hotspots:** which files will be **[review closely]**.
+6. **Ownership:** tag every piece **[yours]** or **[Claude]** (rules: root CLAUDE.md, "Working with the user"). For each **[yours]** piece, include:
+   - **What to build:** the file, the signature/interface Claude will create, and the behavior. Name the failing tests that define done.
+   - **Read first:** 1–3 resources. Prefer official docs sections (FastAPI, SQLAlchemy/SQLModel, Postgres, pytest, React, Zustand, Expo), plus a ROADMAP §3 note or an existing file in this repo that shows the pattern.
+   - **Skeleton:** a tiny code block (about 3–10 lines) showing the *pattern* or API shape, not the solution. For example, how a context manager or `SELECT … FOR UPDATE SKIP LOCKED` looks in SQLAlchemy, with names that aren't ours.
+   - **Gotchas:** 1–3 edge cases the tests will check.
+   Infra-only issues have no **[yours]** pieces.
 
 Exit plan mode for approval. Don't write code until the user approves. If they change the plan in ways that alter the AC, that's a deviation (step 6).
 
@@ -69,6 +76,15 @@ Once approved, save the plan as written (with the user's changes) to `.claude-ou
 
 ## 5. Implement
 
+- **Claude's part first:**
+  - All **[Claude]** pieces.
+  - For each **[yours]** piece:
+    - the **failing tests**
+    - the file with its signature and docstring, plus a body that raises `NotImplementedError("yours: <issue#> <piece>")` in Python, or `throw new Error("yours: …")` in TS
+    - the wiring that calls it
+  Run the tests and confirm that only the **[yours]** tests fail.
+- **Then hand over ("your turn"):** list each **[yours]** piece with its file, the tests to make pass, and the command to run them (`uv run pytest -q tests/test_x.py`, `npx jest x`). Then **stop** and wait for the user to say they're done.
+- **Review their code** when they say so. Check correctness and edge cases against the AC, idioms and existing patterns, and naming. Tell the user what to change and why; don't rewrite it. Fix their code only when they ask. Repeat until the tests pass and the user is happy, then continue with step 7.
 - Stay inside the Scope. Follow existing patterns in the feature folder.
 - Keep the AC list as a running checklist (TaskCreate/todo). Tick each one when its test passes.
 - Docs ship with the code (root CLAUDE.md "Docs" rules): update the doc that describes changed behavior, and add an ADR for significant choices.
@@ -98,7 +114,7 @@ Report, in this order:
 2. **AC status table:** AC → done / changed (with link to the comment) → proven by (test name, or manual step #).
 3. **Verify:** each step's PASS/FAIL/SKIP line.
 4. **Test by hand:** numbered steps on web (`npm run web`) and/or Expo Go, saying what to do and what should happen. Cover every AC that no automated test proves.
-5. **Review hotspots:** files to read closely, one line each.
+5. **Review hotspots:** files to read closely, one line each. Mark which ones the user wrote.
 6. **Follow-ups:** proposed issues for out-of-scope findings, or none.
 
 Write the same report to `.claude-output/<issue#>-<slug>/implementation.md` (heading `# Implementation: #<n> <issue title>`), plus a short **Changes from the plan** section if anything differed from `plan.md`. If the work changes after handoff, update the file.
