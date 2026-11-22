@@ -150,7 +150,7 @@ On PRs that touch `infra/**` (or this workflow), it logs in as the **dev** deplo
 On PRs from this repo that touch `frontend/**`, `shared/**`, `.nvmrc` or the workflow itself, on `opened` / `synchronize` / `reopened` / `closed`:
 
 1. Logs in as the **dev** deploy identity (repository variable `AZURE_WHATIF_CLIENT_ID`, the same `pull_request` federated credential as the what-if).
-2. Reads the `swa-cubetutor-dev` deployment token (masked) and the dev API URL (`az containerapp show`, so it's never hardcoded).
+2. Reads the `swa-cubetutor-dev` deployment token (masked) and the dev API URL (`az containerapp show`, so it's never hardcoded). If `ca-cubetutor-api-dev` doesn't exist (a PR that recreates the dev environment only gets it back from `Deploy dev` after merge), the job warns, still deploys the preview without an API URL, and the comment says login won't work. `closed` reads only the token, so deleting a preview never depends on the API.
 3. Builds the web app with `EXPO_PUBLIC_API_URL=<dev API>` and deploys it with [`Azure/static-web-apps-deploy`](https://github.com/Azure/static-web-apps-deploy) (`action: upload`, `skip_app_build`). On a `pull_request` event the action creates the preview environment named after the PR number: `https://<sub>-<PR#>.<region>.<rest>`. The dev API allows that origin through `CORS_ORIGIN_REGEX` ([infra.md](infra.md#secrets)), so login works there.
 4. Posts the URL as **one** PR comment and updates it on later pushes (hidden `<!-- web-preview -->` marker, same `gh api` code as the what-if).
 5. On `closed` it skips the build and runs the action with `action: close`, which deletes the preview environment, then updates the comment to say so.

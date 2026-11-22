@@ -63,9 +63,17 @@ jobs:
             --query properties.apiKey --output tsv)
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
-          fqdn=$(az containerapp show --name "$API_APP" --resource-group "$RESOURCE_GROUP" \
-            --query properties.configuration.ingress.fqdn --output tsv)
-          echo "api_url=https://$fqdn" >> "$GITHUB_OUTPUT"
+          # Closing only needs the token: deleting a preview must never depend on the API.
+          [ "$CLOSING" = "true" ] && exit 0
+          # The dev API can be missing (e.g. a PR that recreates the environment:
+          # it only comes back when Deploy dev runs after merge). Still deploy the
+          # preview, say so in the comment, and leave the API URL empty.
+          if fqdn=$(az containerapp show --name "$API_APP" --resource-group "$RESOURCE_GROUP" \
+              --query properties.configuration.ingress.fqdn --output tsv) && [ -n "$fqdn" ]; then
+            echo "api_url=https://$fqdn" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$API_APP not found in $RESOURCE_GROUP; the preview is built without an API URL, so API calls will fail."
+          fi
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: env.CLOSING != 'true'
@@ -121,6 +129,8 @@ jobs:
             echo
             if [ "$CLOSING" = "true" ]; then
               echo "Preview environment deleted (PR closed)."
+            elif [ "$DEPLOY" = "success" ] && [ -n "$URL" ] && [ -z "$API_URL" ]; then
+              echo "**$URL** (⚠️ the dev API isn't deployed, so login and API calls fail; it returns with the next \`Deploy dev\`)"
             elif [ "$DEPLOY" = "success" ] && [ -n "$URL" ]; then
               echo "**$URL** (calls the dev API: $API_URL)"
             else
