@@ -6,11 +6,19 @@
 //     User Access Administrator, or any role to a user is denied.
 // Nothing is assigned at subscription scope, so the identity can't see or change
 // the other environment or the other project in this subscription.
+// Also gives the person running the bootstrap Key Vault Secrets Officer here, so
+// they can set the app's secrets (RBAC-mode vaults don't let Owner read or write
+// secrets). The condition above stops the deploy identity from removing it: that
+// assignment's principal is a User.
 param principalId string
+
+@description('Object ID of the user who runs the bootstrap (az ad signed-in-user show --query id -o tsv).')
+param ownerPrincipalId string
 
 var roleIds = {
   contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
   rbacAdministrator: 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
+  keyVaultSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
   // The only roles main.bicep assigns. Add a role here when the template needs it.
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -65,5 +73,15 @@ resource rbacAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     description: 'CubeTutor deploy identity: assign only Key Vault Secrets User / Storage Blob Data Contributor to managed identities'
     conditionVersion: '2.0'
     condition: replace(rbacCondition, 'ASSIGNABLE_ROLES', assignableRoles)
+  }
+}
+
+resource ownerSecretsOfficer 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, ownerPrincipalId, roleIds.keyVaultSecretsOfficer)
+  properties: {
+    principalId: ownerPrincipalId
+    principalType: 'User'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.keyVaultSecretsOfficer)
+    description: 'CubeTutor owner: set and rotate the app secrets in this environment\'s Key Vault'
   }
 }

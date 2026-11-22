@@ -11,11 +11,17 @@ param environmentName string
 
 param location string = resourceGroup().location
 
-@description('Image for the api app. A public placeholder until 23b passes the backend image digest.')
-param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Image for the api app. deploy.yml passes the running image, then the new digest once the migration job succeeds; infra-whatif.yml passes the running image. Empty = the public placeholder (a fresh environment).')
+param apiImage string = ''
 
-@description('Port the api image listens on (80 for the placeholder).')
-param apiTargetPort int = 80
+@description('Image for the migration job. deploy.yml passes the digest being deployed. Empty = the api image.')
+param migrateImage string = ''
+
+// What a fresh environment runs before the first backend rollout. It listens on
+// 80 and has no /health endpoints, so it gets no probes.
+var placeholderImage = 'mcr.microsoft.com/k8se/quickstart:latest'
+var api = empty(apiImage) ? placeholderImage : apiImage
+var migrate = empty(migrateImage) ? api : migrateImage
 
 @description('Log Analytics daily ingestion cap in GB; a cost guardrail (5 GB/month is free).')
 param logDailyQuotaGb string = '0.15'
@@ -72,8 +78,23 @@ module containerApps 'modules/containerApps.bicep' = {
     appName: 'ca-cubetutor-api-${environmentName}'
     workspaceName: monitoring.outputs.workspaceName
     identityId: apiIdentity.id
-    image: apiImage
-    targetPort: apiTargetPort
+    image: api
+    isBackendImage: api != placeholderImage
+    keyVaultUri: keyVault.outputs.uri
+    corsOrigins: 'https://${staticWebApp.outputs.defaultHostname}'
+    tags: tags
+  }
+}
+
+module migrateJob 'modules/migrateJob.bicep' = {
+  name: 'migratejob'
+  params: {
+    location: location
+    name: 'caj-cubetutor-migrate-${environmentName}'
+    environmentId: containerApps.outputs.environmentId
+    identityId: apiIdentity.id
+    image: migrate
+    keyVaultUri: keyVault.outputs.uri
     tags: tags
   }
 }
@@ -88,6 +109,8 @@ module staticWebApp 'modules/staticWebApp.bicep' = {
 }
 
 output apiUrl string = containerApps.outputs.url
+output apiAppName string = containerApps.outputs.appName
+output migrateJobName string = migrateJob.outputs.name
 output apiIdentityClientId string = apiIdentity.properties.clientId
 output keyVaultName string = keyVault.outputs.name
 output storageAccountName string = storage.outputs.name

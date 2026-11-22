@@ -1,10 +1,14 @@
 # Reusable deploy of one image digest to one GitHub environment.
 # Called by deploy-dev.yml (dev) and deploy-prod.yml (production; the
 # environment's required reviewer approves before this job starts).
-# 23a: logs in to Azure with OIDC (no stored secret) as that environment's
-# deploy identity and applies infra/main.bicep to rg-cubetutor-<env>.
+# Logs in to Azure with OIDC (no stored secret) as that environment's deploy
+# identity, then, in this order (a failed step stops the run):
+#   1. Bicep: the migration job gets the NEW image; api keeps its RUNNING image
+#   2. run the migration job and wait for it (api unchanged if it fails)
+#   3. Bicep again: api gets the new image
+#   4. smoke test /health/ready on the new revision
 # The callers must grant `id-token: write` to the job that calls this file.
-# 23b adds the migration job, the image rollout and the smoke test. See docs/infra.md.
+# See docs/ci-cd.md and docs/infra.md.
 name: Deploy
 
 on:
@@ -21,6 +25,11 @@ on:
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    # Explicit `bash` = `bash -eo pipefail` (the implicit default has no pipefail).
+    shell: bash
 
 jobs:
   deploy:
@@ -53,6 +62,7 @@ jobs:
             production) short=prod ;;
             *) echo "::error::unknown environment '$ENVIRONMENT'"; exit 1 ;;
           esac
+          echo "short=$short" >> "$GITHUB_OUTPUT"
           echo "resource_group=rg-cubetutor-$short" >> "$GITHUB_OUTPUT"
           echo "params=infra/$short.bicepparam" >> "$GITHUB_OUTPUT"
       - name: azure login (OIDC)
@@ -63,32 +73,123 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: provision infrastructure (Bicep)
-        id: bicep
-        env:
-          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
-          PARAMS: ${{ steps.target.outputs.params }}
+      - name: azure cli setup
         run: |
           # Same Bicep version as the `infra` CI job (ci.yml).
           az bicep install --version v0.49.2
+          # containerapp / log-analytics commands may need an extension: never prompt.
+          az config set extension.use_dynamic_install=yes_without_prompt
+      - name: read the running api image
+        id: current
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          SHORT: ${{ steps.target.outputs.short }}
+        run: |
+          # Pass 1 must keep api on what it runs now; defaulting to the
+          # placeholder would roll it back on every deploy. Empty = no app yet
+          # (a fresh environment), so Bicep's placeholder default applies.
+          image=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "ca-cubetutor-api-$SHORT" \
+            --query 'properties.template.containers[0].image' --output tsv 2>/dev/null || true)
+          echo "Running api image: ${image:-<none>}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - name: "1. Bicep: migration job on the new image, api unchanged"
+        id: bicep1
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          PARAMS: ${{ steps.target.outputs.params }}
+          IMAGE: ${{ inputs.image }}
+          CURRENT: ${{ steps.current.outputs.image }}
+        run: |
           # Incremental mode: resources not in the template are left alone.
-          api_url=$(az deployment group create \
+          outputs=$(az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
-            --name "cubetutor-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --name "cubetutor-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-1" \
             --parameters "$PARAMS" \
-            --query properties.outputs.apiUrl.value --output tsv)
-          echo "api_url=$api_url" >> "$GITHUB_OUTPUT"
+            --parameters migrateImage="$IMAGE" ${CURRENT:+apiImage="$CURRENT"} \
+            --query properties.outputs --output json)
+          {
+            echo "api_url=$(jq -r .apiUrl.value <<<"$outputs")"
+            echo "api_app=$(jq -r .apiAppName.value <<<"$outputs")"
+            echo "job=$(jq -r .migrateJobName.value <<<"$outputs")"
+          } >> "$GITHUB_OUTPUT"
+      - name: "2. run the migration job and wait for it"
+        id: migrate
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          JOB: ${{ steps.bicep1.outputs.job }}
+        run: bash infra/scripts/run-migration.sh "$RESOURCE_GROUP" "$JOB"
+      - name: "3. Bicep: api on the new image"
+        id: bicep2
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          PARAMS: ${{ steps.target.outputs.params }}
+          IMAGE: ${{ inputs.image }}
+        run: |
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "cubetutor-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-2" \
+            --parameters "$PARAMS" \
+            --parameters migrateImage="$IMAGE" apiImage="$IMAGE" \
+            --output none
+      - name: "4. smoke test: /health/ready on the new revision"
+        id: smoke
+        env:
+          RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
+          API_APP: ${{ steps.bicep1.outputs.api_app }}
+          API_URL: ${{ steps.bicep1.outputs.api_url }}
+          IMAGE: ${{ inputs.image }}
+        run: |
+          # Single revision mode: the URL serves the old revision until the new
+          # one is ready, so a 200 only counts once the latest revision (running
+          # our digest) is also the latest ready one. Cold start from 0 replicas
+          # can take a minute or more: back off for up to ~3 minutes.
+          delay=5
+          deadline=$((SECONDS + 180))
+          while :; do
+            info=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$API_APP" \
+              --query '[properties.latestRevisionName, properties.latestReadyRevisionName, properties.template.containers[0].image]' \
+              --output tsv)
+            mapfile -t f <<<"$info"
+            latest="${f[0]:-}" ready="${f[1]:-}" image="${f[2]:-}"
+            if [ "$image" != "$IMAGE" ]; then
+              echo "::error::api runs '$image', expected '$IMAGE'"
+              exit 1
+            fi
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 15 "$API_URL/health/ready" || true)
+            echo "$(date -u +%H:%M:%S) revision $latest (latest ready: $ready) GET /health/ready -> $code"
+            if [ "$latest" = "$ready" ] && [ "$code" = "200" ]; then
+              echo "status=200 ($latest)" >> "$GITHUB_OUTPUT"
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "status=$code (revision $latest, latest ready $ready)" >> "$GITHUB_OUTPUT"
+              echo "::error::$API_URL/health/ready: no 200 from revision $latest within 3 minutes (last: $code, latest ready: $ready)"
+              exit 1
+            fi
+            sleep "$delay"
+            delay=$(( delay * 2 > 30 ? 30 : delay * 2 ))
+          done
       - name: summary
+        if: always()
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           IMAGE: ${{ inputs.image }}
           RESOURCE_GROUP: ${{ steps.target.outputs.resource_group }}
-          API_URL: ${{ steps.bicep.outputs.api_url }}
+          API_URL: ${{ steps.bicep1.outputs.api_url }}
+          EXECUTION: ${{ steps.migrate.outputs.execution }}
+          MIGRATE: ${{ steps.migrate.outcome }}
+          ROLLOUT: ${{ steps.bicep2.outcome }}
+          READY: ${{ steps.smoke.outputs.status }}
         run: |
           {
             echo "### Deploy to \`$ENVIRONMENT\`"
             echo
-            echo "- Resource group: \`$RESOURCE_GROUP\` (infra/main.bicep applied)"
-            echo "- api: $API_URL (placeholder image until 23b)"
-            echo "- Image built for this commit: \`$IMAGE\` (rolled out from 23b)"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image | \`$IMAGE\` |"
+            echo "| Resource group | \`$RESOURCE_GROUP\` |"
+            echo "| Migration execution | \`${EXECUTION:-not started}\` ($MIGRATE) |"
+            echo "| api rollout | $ROLLOUT |"
+            echo "| API | ${API_URL:-unknown} |"
+            echo "| \`/health/ready\` | ${READY:-not checked} |"
           } >> "$GITHUB_STEP_SUMMARY"
