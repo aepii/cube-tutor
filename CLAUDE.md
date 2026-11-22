@@ -6,7 +6,10 @@ More instructions load only when relevant: `frontend/CLAUDE.md`, `backend/CLAUDE
 
 ## Working with the user
 
-- The user is an experienced engineer who **orchestrates and reviews**; Claude builds features end to end, including core logic. Don't leave "you write this" stubs.
+- The user is an experienced engineer who orchestrates and reviews, and **writes the core backend/frontend logic themselves** to keep their skills sharp. Work is split by ownership:
+  - **Yours (the user's):** core backend and frontend logic, meaning anything that encodes a rule or algorithm. Examples: domain/service logic, job state machines, queue and worker loops, auth/token logic, SQL/stats queries, Zustand store logic, hooks, the cube engine and parser. The plan points to resources and gives tiny skeleton examples (a few lines showing the pattern, not the solution). Claude doesn't write this code unless the user asks.
+  - **Claude's:** infra and CI/CD (Bicep, workflows, Docker, scripts), scaffolding and wiring (routes, DI, Compose, config), migrations, docs, and the **tests, written first, which act as the spec** for the user's code.
+  - The `/work` plan tags each piece **[yours]** or **[Claude]**. The user can reassign any of them when approving the plan. Infra-only issues are all Claude's.
 - **Never commit, push, or open a PR until the user has tested the change locally and says so.** Finish the work, verify it (`/verify` skill), then stop and list exactly what to test by hand.
 - **One branch and one PR per feature / unit of work, always branched from `master`** (unless the user says otherwise). A ROADMAP phase can span several PRs; its sub-steps (4a, 4b, …) are the units, each branched from `master` after its prerequisites merge. Don't stack PRs on other feature branches: on this repo, stacked PRs merged into their stale base branches instead of `master` (PRs #2–#5 had to be re-landed). If work truly depends on something unmerged, ask first.
 - PRs (branch check, description with close-review vs. skim): `/pr` skill.
