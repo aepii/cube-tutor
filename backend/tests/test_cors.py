@@ -41,7 +41,9 @@ def _client(**settings) -> TestClient:
 def test_preview_origin_rejected_without_regex():
     # Prod and local: exact origins only.
     client = _client(CORS_ORIGINS=["http://a.test"])
-    assert "access-control-allow-origin" not in _preflight(client, PREVIEW_ORIGIN).headers
+    assert (
+        "access-control-allow-origin" not in _preflight(client, PREVIEW_ORIGIN).headers
+    )
 
 
 def test_preview_origin_allowed_by_regex():

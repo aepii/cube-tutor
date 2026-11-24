@@ -7,10 +7,13 @@ if TYPE_CHECKING:
     from .algorithm_solution import AlgorithmSolution
     from .user import User
 
+
 # Defines the user algorithm model for the database layer
 class UserAlgorithm(SQLModel, table=True):
     __table_args__ = (
-        UniqueConstraint("user_id", "algorithm_id", name="uq_useralgorithm_user_algorithm"),
+        UniqueConstraint(
+            "user_id", "algorithm_id", name="uq_useralgorithm_user_algorithm"
+        ),
     )
 
     id: int | None = Field(default=None, primary_key=True)

@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 # Defines the algorithm solution model for the database layer
 class AlgorithmSolution(SQLModel, table=True):
     __table_args__ = (
-        UniqueConstraint("case_id", "solution", name="uq_algorithmsolution_case_solution"),
+        UniqueConstraint(
+            "case_id", "solution", name="uq_algorithmsolution_case_solution"
+        ),
     )
 
     id: int | None = Field(default=None, primary_key=True)

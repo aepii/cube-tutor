@@ -79,7 +79,9 @@ def test_request_has_no_send_receive_spans(monkeypatch):
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setenv("OTEL_PYTHON_FASTAPI_EXCLUDED_URLS", telemetry.DEFAULT_EXCLUDED_URLS)
+    monkeypatch.setenv(
+        "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS", telemetry.DEFAULT_EXCLUDED_URLS
+    )
     telemetry._instrument_fastapi(tracer_provider=provider)
     try:
         client = TestClient(create_app(Settings(_env_file=None)))
