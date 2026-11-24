@@ -344,7 +344,7 @@ Phase numbers are IDs, not order. The recommended order is below the diagram.
 | 21 Race mode | 11, 23, Redis |
 | 22 Cross trainer | 15 |
 
-**Recommended order (architecture first):** **4 → 9 → 23 → 24** (4a–4f → 9a–9b → 23a–23c → 24a–24c) → 3 (3a, 3b) → 6 → 17 → 16 → 10 → 11 → 12 → 13 → 15 → 22 → 14 → 18 → 20 → 8 → 19 → 21, with 7 slotted in whenever.
+**Recommended order (architecture first):** **4 → 9 → 23 → 24** (4a–4f → 9a–9b → 23a–23c → 24a–24d) → 3 (3a, 3b) → 6 → 17 → 16 → 10 → 11 → 12 → 13 → 15 → 22 → 14 → 18 → 20 → 8 → 19 → 21, with 7 slotted in whenever.
 - **Architecture first, as a "walking skeleton":** CI, dev/prod environments on Azure, and the job queue are built and deployed end to end *before* the features that use them, with only trivial functionality at first. Every feature after that lands on a working pipeline and is live in dev on merge. Interviewers value this more than any single feature, and it's the part that's hard to bolt on later.
 - **Then the demo:** 6, 17 and 16 make the app usable and shareable for someone who can't solve a cube.
 - **The solver (13 → 15) moves ahead of uploads** so the job queue gets its first real workload early.
@@ -513,28 +513,30 @@ Ships as 3 PRs in order: 23a → 23b → 23c.
 ### Phase 24 — Background jobs on Service Bus **[review closely]** (architecture track, step 4; replaces Celery)
 _Builds on:_ Phase 4, Phase 23. _See §3.10._
 
-Ships as 3 PRs in order: 24a → 24b → 24c. 24a is the core logic and needs no Azure, so it's reviewed on its own.
+Ships as 4 PRs in order: 24a → 24b → 24c → 24d. 24a and 24b are the core logic and need no Azure, so each is reviewed on its own. (24a was split into 24a/24b on 2026-11-22; the old 24b/24c became 24c/24d.)
 
-**24a — Job model + worker core (in-memory)**
-- [ ] `Job` model + migration; `GET /v1/jobs/{id}` (only the owner can read it)
-- [ ] `JobQueue` interface + `InMemoryJobQueue` (tests)
-- [ ] Worker (`python -m app.worker`):
-  - peek-lock receive; idempotent on `job_id`; lock renewal
-  - complete / abandon (transient) / dead-letter (permanent)
-  - stops cleanly on SIGTERM
-  - job handlers looked up by `type`
-- [ ] Sweeper re-sends stale `pending` jobs
-- [ ] First job type: `diagnostic.echo` (proves the pipeline). The solver (Phase 15) is the first real workload.
-- [ ] Tests: unit tests with the in-memory queue
+**24a — Job model, queue contract, jobs API (in-memory)** (#54)
+- [x] `Job` model + migration (status check, `(status, updated_at)` index)
+- [x] `JobQueue` interface + `InMemoryJobQueue` with Service Bus peek-lock semantics (lock duration, delivery count → DLQ, renew, injectable clock)
+- [x] `POST /v1/jobs` (202; only allowlisted types, first one `diagnostic.echo`) and `GET /v1/jobs/{id}` (only the owner can read it; 404 otherwise)
+- [x] Enqueue = commit, then send; sweeper re-sends stale `pending` jobs
+- [x] ADR 0008 (supersedes 0004)
+- [x] Tests: unit tests with the in-memory queue
 
-**24b — Service Bus locally (emulator)**
-- [ ] `ServiceBusJobQueue` implementation of the `JobQueue` interface
+**24b — Worker loop (in-memory)** (#55)
+- [ ] Job handlers looked up by `type`; `diagnostic.echo` (proves the pipeline). The solver (Phase 15) is the first real workload.
+- [ ] Worker: peek-lock receive; idempotent on `job_id`; lock renewal; complete / abandon (transient) / dead-letter (permanent); stops cleanly when told to
 - [ ] Dead-letter drain marks jobs `failed`
+- [ ] Tests: unit tests with the in-memory queue and a fake clock
+
+**24c — Service Bus locally (emulator)**
+- [ ] `ServiceBusJobQueue` implementation of the `JobQueue` interface
+- [ ] Worker entry point (`python -m app.worker`), SIGTERM → finish the current message and stop
 - [ ] Docker Compose: **Service Bus emulator + Azurite** in (Celery and Redis were already removed in #39; Redis returns when a phase needs it)
 - [ ] Tests: an integration test against the emulator in CI (job round-trip; a poison message ends up dead-lettered and the job `failed`)
 - [ ] Update `CLAUDE.md` (running locally, layout)
 
-**24c — Service Bus on Azure**
+**24d — Service Bus on Azure**
 - [ ] Bicep: Service Bus namespace (Basic) + `jobs` queue (max delivery count, lock duration, dead-lettering) per environment; RBAC: API = Data Sender, worker = Data Receiver
 - [ ] `worker` Container App with the KEDA Service Bus scaler (0..N replicas)
 - [ ] Trace context carried in message properties, so the API request and the worker task show up in one App Insights trace

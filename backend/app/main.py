@@ -1,7 +1,7 @@
 import fastapi
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import algs, auth, health
+from app.api.routes import algs, auth, health, jobs
 from app.core.settings import Settings, settings
 from app.core.telemetry import configure_telemetry
 
@@ -25,6 +25,7 @@ def create_app(s: Settings) -> fastapi.FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(algs.router)
+    app.include_router(jobs.router)
     return app
 
 

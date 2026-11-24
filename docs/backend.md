@@ -44,6 +44,7 @@ Tables are SQLModel classes in [`backend/app/models/`](../backend/app/models/). 
 erDiagram
     user ||--o{ refreshtoken : has
     user ||--o{ useralgorithm : tracks
+    user ||--o{ job : submits
     algorithmcase ||--o{ algorithmsolution : has
     algorithmsolution ||--o{ useralgorithm : "tracked by"
 
@@ -82,6 +83,19 @@ erDiagram
         bool is_learned
         bool is_favorited
     }
+    job {
+        uuid id PK
+        str type
+        str status
+        jsonb payload
+        jsonb result
+        str error
+        int attempts
+        int user_id FK
+        datetime created_at
+        datetime updated_at
+        datetime finished_at
+    }
 ```
 
 | Table | Notes |
@@ -91,8 +105,37 @@ erDiagram
 | [`algorithmcase`](../backend/app/models/algorithm_case.py) | One scraped case. `subset` = F2L/OLL/PLL; `setup` = algorithm that creates the case from solved. Unique `(subset, name, subgroup)` (`uq_algorithmcase_subset_name_subgroup`) |
 | [`algorithmsolution`](../backend/app/models/algorithm_solution.py) | One solution string per row; `orientation` from the scrape. Unique `(case_id, solution)` (`uq_algorithmsolution_case_solution`) |
 | [`useralgorithm`](../backend/app/models/user_algorithm.py) | Per-user flags. `algorithm_id` points at **`algorithmsolution`**, not the case. Unique `(user_id, algorithm_id)` (`uq_useralgorithm_user_algorithm`): at most one link row per user and solution, which the flag endpoints upsert on |
+| [`job`](../backend/app/models/job.py) | One background job ([§ Jobs](#jobs)). `id` is a `uuid4` set by the app. `status` is a VARCHAR checked by `ck_job_status` (`pending`/`running`/`done`/`failed`), not a Postgres ENUM. `payload`/`result` are JSONB. `updated_at` is bumped on every ORM update. Indexes: `ix_job_status_updated_at` (the sweeper), `ix_job_user_id` |
 
 - **Duplicates are ruled out by the schema (4f).** The three unique constraints above are named explicitly in the models (`__table_args__`), so `alembic check` and downgrades stay stable. The seed still checks with lookups first; switching it to `ON CONFLICT DO NOTHING` is a follow-up.
+
+## Jobs
+
+Background work ([ADR 0008](decisions/0008-service-bus-jobs.md), ROADMAP §3.10). Code: [`app/jobs/`](../backend/app/jobs/), [`api/routes/jobs.py`](../backend/app/api/routes/jobs.py).
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant DB as Postgres
+    participant Q as JobQueue
+    C->>A: POST /v1/jobs {type, payload}
+    A->>DB: INSERT job (pending), COMMIT
+    A->>Q: send {job_id, type}
+    A-->>C: 202 {id, status: pending}
+    Note over A,Q: send fails → still 202; the sweeper re-sends later
+    C->>A: GET /v1/jobs/{id}
+    A->>DB: SELECT … WHERE id = :id AND user_id = :me
+    A-->>C: 200 {status, result, error, attempts} or 404
+```
+
+- **The row is the source of truth;** the queue carries only `{job_id, type}` ([`queue.py`](../backend/app/jobs/queue.py) `JobMessage`).
+- **Submittable types** are the `JobCreate` schema ([`api/schemas/job.py`](../backend/app/api/schemas/job.py)): today only `diagnostic.echo` with `{message, fail?: "transient" | "permanent"}`, extra keys rejected. Anything else is a 422 before any DB work. Worker-only types are simply left out of the schema.
+- **Enqueue** ([`service.py`](../backend/app/jobs/service.py) `enqueue`): commit, then send. A send error is logged and the request still returns 202; the job stays `pending`.
+- **Sweeper** (`resend_stale_pending(older_than)`): re-sends `pending` jobs whose `updated_at` is strictly older than the threshold and touches `updated_at`, so the next sweep waits another threshold. Never re-sends `running`/`done`/`failed`. Duplicates are fine: delivery is at-least-once and the worker is idempotent. Nothing calls it on a schedule yet (the worker loop does, in 24b).
+- **`JobQueue` contract** (Service Bus peek-lock; see the `queue.py` docstring): `send`; `receive(max_wait)` locks a message for `lock_duration` and returns a `ReceivedMessage` (`lock_token`, `delivery_count`, `locked_until`); settle it with `complete`, `abandon` or `dead_letter(reason)`; `renew_lock` extends it; acting on an expired or settled lock raises `LockLostError`. A message abandoned or expired on its `max_delivery_count`-th delivery goes to the dead-letter queue with reason `MaxDeliveryCountExceeded`. `receive_dead_lettered` reads the DLQ the same way.
+- **`InMemoryJobQueue`** ([`memory.py`](../backend/app/jobs/memory.py)) implements it in one process, with an injectable clock so tests never sleep. `get_job_queue` ([`deps.py`](../backend/app/jobs/deps.py)) returns one process-wide instance; tests override it.
+- **Today (24a) there is no worker**, so a job posted to a running API stays `pending`. 24b adds the worker loop and handlers, 24c `ServiceBusJobQueue` + the emulator, 24d Azure.
 
 ## Auth flow
 
@@ -103,7 +146,7 @@ Code: [`api/routes/auth.py`](../backend/app/api/routes/auth.py), [`core/security
 - **Refresh-token storage:** the row holds `sha256(token)` as hex. bcrypt isn't used here: the token is an HMAC-signed JWT carrying a random `jti` (uuid4, 122 random bits), so there's no low-entropy secret to brute-force, and a deterministic hash allows one indexed equality lookup. It also covers the whole token, where bcrypt reads only the first 72 bytes. No timing-safe compare is needed, because the database matches on the full hash. Passwords stay on bcrypt.
 - **Register / login** return `{access_token, refresh_token, token_type: "bearer"}`, and store a hashed refresh-token row. Register keeps its SELECT pre-checks for the friendly error. If a concurrent registration wins the race, the `user` unique constraint raises `IntegrityError`; the route rolls back and returns the same 400 (`user_email_key` → "Email already registered", `user_username_key` → "Username already registered").
 - **Refresh** (rotation): decode → look up the row by `sha256(token)` (one query) → reject with 401 unless it belongs to `sub`, isn't revoked and hasn't expired. The row is then marked revoked and a new pair is issued, so a rotated token can't be reused.
-- **Cleanup:** login and a successful refresh delete that user's rows whose `expires_at` has passed, revoked or not. There's no scheduled job yet (Phase 24).
+- **Cleanup:** login and a successful refresh delete that user's rows whose `expires_at` has passed, revoked or not. There's no scheduled cleanup job (the job system in [§ Jobs](#jobs) has no scheduler yet).
 - **Logout:** looks the row up the same way and marks it revoked. Returns 200 `"Logged out"` whether or not a live row matched, and `"Already logged out"` if the token doesn't decode.
 - **Protected routes** use `get_current_user`. It takes a bearer token (`OAuth2PasswordBearer(tokenUrl="/v1/auth/login")`), decodes the access JWT and loads the `User`. Any failure is a 401.
 - **Not done yet:** reuse detection (presenting a revoked token doesn't revoke the user's other tokens).
@@ -127,6 +170,8 @@ All routers are included in [`main.py`](../backend/app/main.py). This is the com
 | GET | `/v1/algs/?subset=` | Bearer | → `CaseGroup[]`: `{case_id, case_name, subset, subgroup, setup, solutions: [{solution_id, notation, orientation, is_favorited, is_learned}]}`. One query: solution ⋈ case ⟕ the user's `useralgorithm`, `ORDER BY subset, case.id, solution.id` (stable between calls). Optional `subset` = `F2L` \| `OLL` \| `PLL` (case-sensitive); anything else → 422 | [`algs.py`](../backend/app/api/routes/algs.py) |
 | PUT | `/v1/algs/{alg_id}/favorite` | Bearer | `{value: bool}` → `{algorithm_id, is_favorited}`. **Sets** the flag (idempotent): one `INSERT … ON CONFLICT (user_id, algorithm_id) DO UPDATE` that creates the link row on first use (the other flag starts false) and otherwise updates only this flag. 404 if no such solution, 422 if `value` is missing or not a JSON boolean | `algs.py` |
 | PUT | `/v1/algs/{alg_id}/learn` | Bearer | `{value: bool}` → `{algorithm_id, is_learned}`. Same as favorite (shared `_set_flag` helper). The old `POST` toggles are gone (405) | `algs.py` |
+| POST | `/v1/jobs/` | Bearer | `{type, payload}` → **202** `{id, status: "pending"}`. Only `diagnostic.echo` with `{message, fail?}`; anything else (unknown type, bad or extra fields) → 422 with no row and no message. Still 202 if the queue send fails ([§ Jobs](#jobs)) | [`jobs.py`](../backend/app/api/routes/jobs.py) |
+| GET | `/v1/jobs/{job_id}` | Bearer | → `{id, type, status, result, error, attempts, created_at, updated_at, finished_at}`. **404** for another user's job and for an unknown id (same body), so existence isn't revealed. A malformed UUID → 422 | `jobs.py` |
 | GET | `/health/live` | — | → `{status: "ok"}`. Never touches the DB (liveness) | [`health.py`](../backend/app/api/routes/health.py) |
 | GET | `/health/ready` | — | → 200 `{status: "ok"}` if `SELECT 1` succeeds, else 503 `{status: "unavailable"}` (readiness) | `health.py` |
 
@@ -155,6 +200,7 @@ uv run ruff check .
 - **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
 - **Lint:** ruff's default rules plus `I` (import sorting). FastAPI `Depends` and friends are allowed in argument defaults. Migrations are linted too; `alembic/versions/` only ignores F401, since the template always imports `sqlmodel`, and `alembic` is marked third-party so the local `alembic/` folder doesn't confuse import sorting.
+- **Jobs:** [`test_job_queue_memory.py`](../backend/tests/test_job_queue_memory.py) (peek-lock, redelivery, max delivery → DLQ, renew, `LockLostError`, with `FakeClock` from `tests/helpers.py`), [`test_job_service.py`](../backend/tests/test_job_service.py) (commit-then-send, the sweeper's age and status filters), [`test_jobs_api.py`](../backend/tests/test_jobs_api.py) (202/422/401, owner-only 404, a failing send still 202). The queue is swapped with `app.dependency_overrides[get_job_queue]` (a `RecordingQueue` from `tests/helpers.py`, or a fresh `InMemoryJobQueue`).
 - **Seed:** [`test_seed.py`](../backend/tests/test_seed.py) seeds a small temp JSON set via `SEED_DATA_DIR` twice and checks the row counts don't change, and checks the default data dir is the repo's `shared/data/raw`.
 
 ## Migrations
@@ -166,6 +212,7 @@ Alembic is the only thing that creates or changes tables ([`alembic/env.py`](../
   1. [`a92565855791_baseline.py`](../backend/alembic/versions/a92565855791_baseline.py), autogenerated from the models: the five tables, the unique `ix_refreshtoken_hashed_token` index, and the `user.username` / `user.email` unique constraints. Foreign keys and unique constraints use Postgres's default names (no naming convention).
   2. [`ed0be7ac838e_clear_bcrypt_refresh_tokens.py`](../backend/alembic/versions/ed0be7ac838e_clear_bcrypt_refresh_tokens.py) (4e): data only. It deletes every `refreshtoken` row, since bcrypt hashes can't be converted to sha256, so everyone logs in again once. The downgrade does nothing.
   3. [`3f1c9d2b7a64_unique_constraints.py`](../backend/alembic/versions/3f1c9d2b7a64_unique_constraints.py) (4f): adds the three named unique constraints on `algorithmcase`, `algorithmsolution` and `useralgorithm`. It doesn't dedupe: if duplicates exist, the upgrade fails loudly. The downgrade drops the constraints.
+  4. [`b0b44e4b3483_add_job_table.py`](../backend/alembic/versions/b0b44e4b3483_add_job_table.py) (24a): creates `job` with `ck_job_status`, `ix_job_status_updated_at` and `ix_job_user_id`. A new table only (expand step). The downgrade drops it.
 - **Adding a migration:** see [`backend/CLAUDE.md`](../backend/CLAUDE.md#changing-the-schema). The new template ([`script.py.mako`](../backend/alembic/script.py.mako)) produces ruff-clean files.
 
 ### Moving a pre-4b database onto the baseline
