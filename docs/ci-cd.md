@@ -26,7 +26,7 @@ Runs on every pull request and every push to `master`. Permissions: `contents: r
 |---|---|---|
 | `changes` | always | [`dorny/paths-filter`](https://github.com/dorny/paths-filter) decides which jobs below run |
 | `frontend` | `frontend/**`, `shared/**`, `.nvmrc` | Node from `.nvmrc` (24), `npm ci` (npm cache), `tsc --noEmit`, `jest --ci`, `expo lint`, `expo export --platform web` |
-| `backend` | `backend/**`, `shared/**` | uv (cache keyed on `backend/uv.lock`), Python 3.12, `uv sync --locked`, `ruff check`, `pytest` against a `postgres:18` service container |
+| `backend` | `backend/**`, `shared/**` | uv (cache keyed on `backend/uv.lock`), Python 3.12, `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest` against a `postgres:18` service container |
 | `docker` | `backend/**`, `shared/data/**`, `.dockerignore` | Builds `backend/Dockerfile` (context = repo root) with buildx and the GHA layer cache; **no push** |
 | `infra` | `infra/**` | Installs Bicep (pinned, `v0.49.2`), then [`infra/lint.sh`](../infra/lint.sh): `bicep lint` with SARIF output on every `.bicep` / `.bicepparam`. **Any** diagnostic fails the job, including linter warnings and compiler (BCP) warnings. Rule levels are in `infra/bicepconfig.json`. No Azure login. |
 | `ci-ok` | always | Fails if any job above failed or was cancelled; skipped jobs count as passing |

@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Run CubeTutor's full pre-handoff check (frontend tsc, jest, expo lint, web + android exports, plus backend uv sync, ruff and pytest). Use before handing work back to the user or before drafting a PR.
+description: Run CubeTutor's full pre-handoff check (frontend tsc, jest, expo lint, web + android exports, plus backend uv sync, ruff check, ruff format --check and pytest). Use before handing work back to the user or before drafting a PR.
 ---
 
 # Verify
@@ -18,7 +18,7 @@ What it does, in order, stopping at the first failure:
 3. `frontend/`: `npx expo lint` (0 errors required; warnings pass)
 4. `frontend/`: `npx expo export --platform web` into a temp dir
 5. `frontend/`: `npx expo export --platform android` into a temp dir
-6. `backend/` (one uv project, ADR 0005): `uv sync --locked` (fails if `uv.lock` is stale), then `uv run --frozen ruff check .` and `uv run --frozen pytest -q`. Needs `uv` on PATH and Compose Postgres up (tests use the `cubetutor_test` database). Missing `uv` is a FAIL.
+6. `backend/` (one uv project, ADR 0005): `uv sync --locked` (fails if `uv.lock` is stale), then `uv run --frozen ruff check .`, `uv run --frozen ruff format --check .` and `uv run --frozen pytest -q`. Needs `uv` on PATH and Compose Postgres up (tests use the `cubetutor_test` database). Missing `uv` is a FAIL.
 
 The temp dir (exports and logs) is deleted on exit, pass or fail.
 

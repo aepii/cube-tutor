@@ -188,6 +188,7 @@ cd backend
 uv sync                      # creates/updates backend/.venv from uv.lock, dev group included
 uv run pytest -q
 uv run ruff check .
+uv run ruff format .        # CI and /verify fail on unformatted code (--check)
 ```
 
 - **Database:** a real Postgres database, `cubetutor_test`, on the Compose server. The URL is `TEST_DATABASE_URL` if set (CI), otherwise it's built from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST_PORT` in the repo-root `.env` on `localhost`. The database is created if missing. If Postgres is unreachable, the run stops with one error naming the URL.
@@ -199,6 +200,7 @@ uv run ruff check .
 - **Algorithms and constraints:** [`test_algs.py`](../backend/tests/test_algs.py) covers ordering (cases inserted out of order), the `subset` filter and its 422, and the PUT flags (set twice → one row, clear, independence, per-user, 404/401/422, old POST → 405). [`test_constraints.py`](../backend/tests/test_constraints.py) inserts a duplicate for each unique key and checks the `IntegrityError` names the expected constraint.
 - **Fixtures:** `client`, `session`, `tokens` / `auth_headers` (registered user `alice`), `algs` (2 cases, 3 solutions). Helpers `register()` and `bearer()` are in `tests/helpers.py`.
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
+- **Format:** `ruff format` with its defaults (Black style, line length 88). CI and `/verify` run `ruff format --check`, so run `uv run ruff format .` before pushing. The one-time format pass is listed in [`.git-blame-ignore-revs`](../.git-blame-ignore-revs) so `git blame` skips it (GitHub does this automatically; locally: `git config blame.ignoreRevsFile .git-blame-ignore-revs`).
 - **Lint:** ruff's default rules plus `I` (import sorting). FastAPI `Depends` and friends are allowed in argument defaults. Migrations are linted too; `alembic/versions/` only ignores F401, since the template always imports `sqlmodel`, and `alembic` is marked third-party so the local `alembic/` folder doesn't confuse import sorting.
 - **Jobs:** [`test_job_queue_memory.py`](../backend/tests/test_job_queue_memory.py) (peek-lock, redelivery, max delivery → DLQ, renew, `LockLostError`, with `FakeClock` from `tests/helpers.py`), [`test_job_service.py`](../backend/tests/test_job_service.py) (commit-then-send, the sweeper's age and status filters), [`test_jobs_api.py`](../backend/tests/test_jobs_api.py) (202/422/401, owner-only 404, a failing send still 202). The queue is swapped with `app.dependency_overrides[get_job_queue]` (a `RecordingQueue` from `tests/helpers.py`, or a fresh `InMemoryJobQueue`).
 - **Seed:** [`test_seed.py`](../backend/tests/test_seed.py) seeds a small temp JSON set via `SEED_DATA_DIR` twice and checks the row counts don't change, and checks the default data dir is the repo's `shared/data/raw`.
