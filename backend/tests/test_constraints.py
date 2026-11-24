@@ -1,9 +1,10 @@
-"""Named unique constraints (4f): the schema, not the routes, rules out duplicates."""
+"""Named constraints: the schema, not the routes, rules out duplicates (4f) and
+unknown job statuses (24a)."""
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.models import AlgorithmCase, AlgorithmSolution, User, UserAlgorithm
+from app.models import AlgorithmCase, AlgorithmSolution, Job, User, UserAlgorithm
 
 
 @pytest.fixture
@@ -41,6 +42,11 @@ def test_keys_are_composite(session, algs, user_id):
     session.add(UserAlgorithm(user_id=user_id, algorithm_id=algs["oll_a"]))
     session.add(UserAlgorithm(user_id=user_id, algorithm_id=algs["oll_b"]))
     session.commit()
+
+
+def test_bad_job_status_is_rejected(session, user_id):
+    session.add(Job(type="diagnostic.echo", payload={}, status="queued", user_id=user_id))
+    _assert_violates(session, "ck_job_status")
 
 
 def _assert_violates(session, constraint: str) -> None:

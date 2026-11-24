@@ -1,6 +1,6 @@
 # 0004 — Celery + Redis for background work
 
-**Status:** **superseded**. Removed in #39 (Celery, Redis, `backend/app/worker/` and `POST /v1/images/upload`) before any real task existed. The replacement is the Service Bus design in [`ROADMAP.md`](../../ROADMAP.md) §3.9, §3.10 and Phase 24: a `Job` table and a direct `azure-servicebus` consumer. Its ADR comes with 24a. The record below is kept as history; its code links no longer resolve.
+**Status:** **superseded**. Removed in #39 (Celery, Redis, `backend/app/worker/` and `POST /v1/images/upload`) before any real task existed. Superseded by [ADR 0008](0008-service-bus-jobs.md): a `Job` table and a direct `azure-servicebus` consumer (ROADMAP §3.10, Phase 24). The record below is kept as history; its code links no longer resolve.
 
 **Evidence:** commit `bf3d73c` (2026-01-29) "Setup Celery + Redis and a mock using a FastAPI endpoint". ROADMAP §5 states the intended use (the scan pipeline, **not built**) and the tradeoff. Current code in [data-pipeline.md](../data-pipeline.md#celery-tasks).
 
