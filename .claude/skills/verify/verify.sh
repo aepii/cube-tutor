@@ -46,6 +46,7 @@ if [ -f "$BE/pyproject.toml" ]; then
   # --locked fails if uv.lock is out of date with pyproject.toml.
   step "backend: uv sync --locked"   "$BE" uv sync --locked
   step "backend: ruff check"         "$BE" uv run --frozen ruff check .
+  step "backend: ruff format --check" "$BE" uv run --frozen ruff format --check .
   step "backend: pytest"             "$BE" uv run --frozen pytest -q
 fi
 

@@ -21,7 +21,14 @@ DEFAULT_EXCLUDED_URLS = "health/.*"
 #  - the HTTP clients: the app makes no outbound HTTP calls, so all they'd
 #    record is the SDK's own config polling (`/AzMonSDKDynamicConfiguration`).
 #    Turn them back on when a feature adds outbound HTTP.
-DISABLED_INSTRUMENTATIONS = ("fastapi", "requests", "urllib", "urllib3", "httpx", "httpx2")
+DISABLED_INSTRUMENTATIONS = (
+    "fastapi",
+    "requests",
+    "urllib",
+    "urllib3",
+    "httpx",
+    "httpx2",
+)
 
 _configured = False
 
@@ -46,7 +53,9 @@ def configure_telemetry(s: Settings) -> bool:
 
     configure_azure_monitor(
         connection_string=s.APPLICATIONINSIGHTS_CONNECTION_STRING,
-        instrumentation_options={lib: {"enabled": False} for lib in DISABLED_INSTRUMENTATIONS},
+        instrumentation_options={
+            lib: {"enabled": False} for lib in DISABLED_INSTRUMENTATIONS
+        },
     )
     # After the distro, so it uses the tracer provider the distro set up.
     _instrument_fastapi()

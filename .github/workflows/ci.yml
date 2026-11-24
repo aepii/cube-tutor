@@ -114,6 +114,8 @@ jobs:
         run: uv sync --locked
       - name: ruff
         run: uv run --frozen ruff check .
+      - name: ruff format --check
+        run: uv run --frozen ruff format --check .
       - name: pytest
         run: uv run --frozen pytest -q
 

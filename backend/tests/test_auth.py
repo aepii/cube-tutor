@@ -22,7 +22,9 @@ def test_register_returns_both_tokens(client):
     body = register(client, "alice")
     assert body["token_type"] == "bearer"
     assert body["access_token"] and body["refresh_token"]
-    assert client.get(PROTECTED, headers=bearer(body["access_token"])).status_code == 200
+    assert (
+        client.get(PROTECTED, headers=bearer(body["access_token"])).status_code == 200
+    )
 
 
 def test_register_duplicate_email_is_400(client):
@@ -56,7 +58,9 @@ def test_login_returns_working_tokens(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["refresh_token"]
-    assert client.get(PROTECTED, headers=bearer(body["access_token"])).status_code == 200
+    assert (
+        client.get(PROTECTED, headers=bearer(body["access_token"])).status_code == 200
+    )
 
 
 def test_login_wrong_password_is_401(client):
@@ -90,8 +94,12 @@ def test_refresh_rotates_the_pair(client, tokens):
 
 def test_reusing_a_rotated_refresh_token_is_401(client, tokens):
     old = tokens["refresh_token"]
-    assert client.post("/v1/auth/refresh", json={"refresh_token": old}).status_code == 200
-    assert client.post("/v1/auth/refresh", json={"refresh_token": old}).status_code == 401
+    assert (
+        client.post("/v1/auth/refresh", json={"refresh_token": old}).status_code == 200
+    )
+    assert (
+        client.post("/v1/auth/refresh", json={"refresh_token": old}).status_code == 401
+    )
 
 
 def test_refresh_with_garbage_is_401(client):
@@ -114,7 +122,9 @@ def test_logout_revokes_the_refresh_token(client, tokens):
     resp = client.post("/v1/auth/logout", json={"refresh_token": rt})
     assert resp.status_code == 200
     assert resp.json()["detail"] == "Logged out"
-    assert client.post("/v1/auth/refresh", json={"refresh_token": rt}).status_code == 401
+    assert (
+        client.post("/v1/auth/refresh", json={"refresh_token": rt}).status_code == 401
+    )
 
 
 def test_logout_with_garbage_is_already_logged_out(client):

@@ -41,4 +41,3 @@ def test_sql_echo_from_env(monkeypatch):
 
 def test_app_engine_does_not_echo_by_default():
     assert engine.echo is False
-

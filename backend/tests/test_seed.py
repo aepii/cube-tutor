@@ -29,7 +29,9 @@ RAW = {
                 "name": "OLL 21",
                 "subgroup": "OCLL",
                 "setup": "R U2 R' U' R U R' U' R U' R'",
-                "solutions": [{"alg": "R U R' U R U' R' U R U2 R'", "orientation": "0"}],
+                "solutions": [
+                    {"alg": "R U R' U R U' R' U R U2 R'", "orientation": "0"}
+                ],
             }
         ],
     },
@@ -72,4 +74,8 @@ def test_seed_reads_seed_data_dir_and_is_idempotent(tmp_path, monkeypatch, sessi
 def test_default_data_dir_is_repo_raw_data(monkeypatch):
     monkeypatch.delenv("SEED_DATA_DIR", raising=False)
     data_dir = seed_algorithms.data_dir()
-    assert {p.name for p in data_dir.glob("*.json")} >= {"f2l.json", "oll.json", "pll.json"}
+    assert {p.name for p in data_dir.glob("*.json")} >= {
+        "f2l.json",
+        "oll.json",
+        "pll.json",
+    }

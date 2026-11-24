@@ -78,9 +78,7 @@ from tests.helpers import bearer, register
 def _ensure_database_exists(url: str) -> None:
     """Create the test database from the `postgres` maintenance DB if missing."""
     parsed = make_url(url)
-    admin = create_engine(
-        parsed.set(database="postgres"), isolation_level="AUTOCOMMIT"
-    )
+    admin = create_engine(parsed.set(database="postgres"), isolation_level="AUTOCOMMIT")
     try:
         with admin.connect() as conn:
             exists = conn.execute(

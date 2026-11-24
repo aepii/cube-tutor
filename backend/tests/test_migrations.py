@@ -45,7 +45,7 @@ def test_upgrade_clears_refresh_tokens():
     with engine.begin() as conn:
         conn.execute(
             text(
-                "INSERT INTO \"user\" (username, email, hashed_password, created_at) "
+                'INSERT INTO "user" (username, email, hashed_password, created_at) '
                 "VALUES ('alice', 'alice@example.com', 'x', now())"
             )
         )
@@ -54,7 +54,7 @@ def test_upgrade_clears_refresh_tokens():
                 "INSERT INTO refreshtoken "
                 "(user_id, hashed_token, expires_at, is_revoked, created_at) "
                 "SELECT id, '$2b$12$bcrypt', now() + interval '1 day', false, now() "
-                "FROM \"user\""
+                'FROM "user"'
             )
         )
     command.upgrade(cfg, "head")

@@ -8,7 +8,10 @@ from app.models import AlgorithmCase, AlgorithmSolution, UserAlgorithm
 from tests.helpers import bearer, register
 
 LIST = "/v1/algs/"
-FLAGS = [("favorite", "is_favorited", "is_learned"), ("learn", "is_learned", "is_favorited")]
+FLAGS = [
+    ("favorite", "is_favorited", "is_learned"),
+    ("learn", "is_learned", "is_favorited"),
+]
 
 
 def _solutions_by_id(body: list[dict]) -> dict[int, dict]:
@@ -40,8 +43,13 @@ def test_list_groups_solutions_under_their_case(client, auth_headers, algs):
         "Dot",
         "R U2 R'",
     )
-    assert [s["solution_id"] for s in oll["solutions"]] == [algs["oll_a"], algs["oll_b"]]
-    assert [s["solution_id"] for s in cases[algs["pll"]]["solutions"]] == [algs["pll_a"]]
+    assert [s["solution_id"] for s in oll["solutions"]] == [
+        algs["oll_a"],
+        algs["oll_b"],
+    ]
+    assert [s["solution_id"] for s in cases[algs["pll"]]["solutions"]] == [
+        algs["pll_a"]
+    ]
 
 
 def test_list_flags_start_false_for_a_new_user(client, auth_headers, algs):
@@ -58,7 +66,9 @@ def test_list_is_empty_without_algorithms(client, auth_headers):
     assert resp.json() == []
 
 
-def test_list_is_ordered_by_subset_then_case_then_solution(client, auth_headers, session):
+def test_list_is_ordered_by_subset_then_case_then_solution(
+    client, auth_headers, session
+):
     # Cases inserted out of subset order; solutions interleaved across cases.
     pll = AlgorithmCase(subset="PLL", name="Ua", subgroup="Edges", setup="x")
     oll2 = AlgorithmCase(subset="OLL", name="OLL 2", subgroup="Dot", setup="x")
@@ -122,7 +132,9 @@ def test_put_true_twice_is_idempotent(
 
 
 @pytest.mark.parametrize(("action", "flag", "other"), FLAGS)
-def test_put_false_clears_the_flag(client, auth_headers, session, algs, action, flag, other):
+def test_put_false_clears_the_flag(
+    client, auth_headers, session, algs, action, flag, other
+):
     alg = algs["oll_a"]
     url = f"/v1/algs/{alg}/{action}"
     client.put(url, json={"value": True}, headers=auth_headers)
@@ -137,9 +149,13 @@ def test_put_false_clears_the_flag(client, auth_headers, session, algs, action, 
 
 
 @pytest.mark.parametrize(("action", "flag", "other"), FLAGS)
-def test_put_false_on_a_new_link_stores_false(client, auth_headers, algs, action, flag, other):
+def test_put_false_on_a_new_link_stores_false(
+    client, auth_headers, algs, action, flag, other
+):
     alg = algs["pll_a"]
-    resp = client.put(f"/v1/algs/{alg}/{action}", json={"value": False}, headers=auth_headers)
+    resp = client.put(
+        f"/v1/algs/{alg}/{action}", json={"value": False}, headers=auth_headers
+    )
     assert resp.json() == {"algorithm_id": alg, flag: False}
     assert _flags(client, auth_headers, alg) == (False, False)
 
@@ -175,7 +191,9 @@ def test_flags_are_per_user(client, auth_headers, algs):
 
 @pytest.mark.parametrize("action", ["favorite", "learn"])
 def test_put_on_missing_algorithm_is_404(client, auth_headers, session, action):
-    resp = client.put(f"/v1/algs/999999/{action}", json={"value": True}, headers=auth_headers)
+    resp = client.put(
+        f"/v1/algs/999999/{action}", json={"value": True}, headers=auth_headers
+    )
     assert resp.status_code == 404
     assert _link_count(session) == 0
 
@@ -189,7 +207,9 @@ def test_put_requires_auth(client, algs, action):
 @pytest.mark.parametrize("action", ["favorite", "learn"])
 @pytest.mark.parametrize("kwargs", [{}, {"json": {}}, {"json": {"value": None}}])
 def test_put_without_value_is_422(client, auth_headers, algs, action, kwargs):
-    resp = client.put(f"/v1/algs/{algs['oll_a']}/{action}", headers=auth_headers, **kwargs)
+    resp = client.put(
+        f"/v1/algs/{algs['oll_a']}/{action}", headers=auth_headers, **kwargs
+    )
     assert resp.status_code == 422
 
 

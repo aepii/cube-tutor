@@ -27,6 +27,7 @@ cd backend
 uv sync                      # once, and after pulling dependency changes
 uv run pytest -q
 uv run ruff check .          # --fix for import order / pyupgrade
+uv run ruff format .         # CI and /verify run --check, so format before pushing
 ```
 
 - Dependencies: `uv add <pkg>` (runtime) or `uv add --dev <pkg>` (tests/lint). Commit `uv.lock`. The image installs `--no-dev`, so anything the app imports must be a runtime dependency.
