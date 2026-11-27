@@ -524,10 +524,10 @@ Ships as 4 PRs in order: 24a → 24b → 24c → 24d. 24a and 24b are the core l
 - [x] Tests: unit tests with the in-memory queue
 
 **24b — Worker loop (in-memory)** (#55)
-- [ ] Job handlers looked up by `type`; `diagnostic.echo` (proves the pipeline). The solver (Phase 15) is the first real workload.
-- [ ] Worker: peek-lock receive; idempotent on `job_id`; lock renewal; complete / abandon (transient) / dead-letter (permanent); stops cleanly when told to
-- [ ] Dead-letter drain marks jobs `failed`
-- [ ] Tests: unit tests with the in-memory queue and a fake clock
+- [x] Job handlers looked up by `type`; `diagnostic.echo` (proves the pipeline). The solver (Phase 15) is the first real workload.
+- [x] Worker: peek-lock receive; idempotent on `job_id`; lock renewal; complete / abandon (transient) / dead-letter (permanent); stops cleanly when told to
+- [x] Dead-letter drain marks jobs `failed`
+- [x] Tests: unit tests with the in-memory queue and a fake clock
 
 **24c — Service Bus locally (emulator)**
 - [ ] `ServiceBusJobQueue` implementation of the `JobQueue` interface

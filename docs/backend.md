@@ -132,10 +132,46 @@ sequenceDiagram
 - **The row is the source of truth;** the queue carries only `{job_id, type}` ([`queue.py`](../backend/app/jobs/queue.py) `JobMessage`).
 - **Submittable types** are the `JobCreate` schema ([`api/schemas/job.py`](../backend/app/api/schemas/job.py)): today only `diagnostic.echo` with `{message, fail?: "transient" | "permanent"}`, extra keys rejected. Anything else is a 422 before any DB work. Worker-only types are simply left out of the schema.
 - **Enqueue** ([`service.py`](../backend/app/jobs/service.py) `enqueue`): commit, then send. A send error is logged and the request still returns 202; the job stays `pending`.
-- **Sweeper** (`resend_stale_pending(older_than)`): re-sends `pending` jobs whose `updated_at` is strictly older than the threshold and touches `updated_at`, so the next sweep waits another threshold. Never re-sends `running`/`done`/`failed`. Duplicates are fine: delivery is at-least-once and the worker is idempotent. Nothing calls it on a schedule yet (the worker loop does, in 24b).
+- **Sweeper** (`resend_stale_pending(older_than)`): re-sends `pending` jobs whose `updated_at` is strictly older than the threshold and touches `updated_at`, so the next sweep waits another threshold. Never re-sends `running`/`done`/`failed`. Duplicates are fine: delivery is at-least-once and the worker is idempotent. The worker loop runs it every `housekeeping_every` seconds ([§ Worker](#worker)).
 - **`JobQueue` contract** (Service Bus peek-lock; see the `queue.py` docstring): `send`; `receive(max_wait)` locks a message for `lock_duration` and returns a `ReceivedMessage` (`lock_token`, `delivery_count`, `locked_until`); settle it with `complete`, `abandon` or `dead_letter(reason)`; `renew_lock` extends it; acting on an expired or settled lock raises `LockLostError`. A message abandoned or expired on its `max_delivery_count`-th delivery goes to the dead-letter queue with reason `MaxDeliveryCountExceeded`. `receive_dead_lettered` reads the DLQ the same way.
 - **`InMemoryJobQueue`** ([`memory.py`](../backend/app/jobs/memory.py)) implements it in one process, with an injectable clock so tests never sleep. `get_job_queue` ([`deps.py`](../backend/app/jobs/deps.py)) returns one process-wide instance; tests override it.
-- **Today (24a) there is no worker**, so a job posted to a running API stays `pending`. 24b adds the worker loop and handlers, 24c `ServiceBusJobQueue` + the emulator, 24d Azure.
+- **Sweeper and drain run from the worker loop** (`run`, below). There's no runnable worker process yet: 24c adds `python -m app.worker` (SIGTERM → `stop`), `ServiceBusJobQueue` and the emulator, 24d Azure. Until then a job posted to a running API stays `pending`.
+
+### Worker
+
+Code: [`worker.py`](../backend/app/jobs/worker.py) (`process_one`, `LockRenewer`, `run`, `WorkerConfig`), [`handlers.py`](../backend/app/jobs/handlers.py), [`errors.py`](../backend/app/jobs/errors.py), [`drain.py`](../backend/app/jobs/drain.py).
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: POST /v1/jobs
+    pending --> running: delivered (attempts += 1)
+    running --> done: handler returns
+    running --> pending: transient error → abandon
+    running --> failed: permanent error → dead-letter
+    pending --> failed: unknown type → dead-letter
+    pending --> failed: drain (MaxDeliveryCountExceeded)
+    running --> running: redelivered after a crash (runs again)
+    done --> [*]
+    failed --> [*]
+```
+
+`process_one` receives one message and acts on what the row says:
+
+| Situation | Job row | Message |
+|---|---|---|
+| No such job | — | dead-letter `JobNotFound` |
+| Job already `done` or `failed` (a duplicate) | unchanged; handler not run | complete |
+| No handler for `type` | `failed`, error names the type, `attempts` unchanged | dead-letter `UnknownJobType` |
+| Handler returns | `done`, `result`, `error` cleared | complete |
+| `PermanentJobError` | `failed`, `error` | dead-letter `PermanentJobError` |
+| `TransientJobError` or any other exception | `pending`, `error` | abandon → redelivered; on the `max_delivery_count`-th delivery the queue dead-letters it (`MaxDeliveryCountExceeded`) |
+| Dead-lettered message (drain) | `failed` with the reason, unless already `done`/`failed` | complete (also for a missing job) |
+
+- **Commit, then settle.** Every outcome is committed to the row before the message is completed, abandoned or dead-lettered. A crash or a lost lock in between means the message comes back, finds the row finished, and is just completed. That's what makes the worker idempotent under at-least-once delivery. A `LockLostError` while settling is logged, not raised.
+- **No transaction is open while a handler runs:** one commit marks it `running` (`attempts += 1`), a second records the outcome.
+- **Lock renewal:** `LockRenewer` wraps the handler call in a background thread that renews the lock once it has `renew_before` seconds or fewer left (checked every `renew_poll` s; the same idea as the SDK's `AutoLockRenewer`). It compares against the queue's clock, so tests drive it with a fake clock.
+- **`run(queue, session_factory, handlers, stop, config)`** loops on `process_one` until `stop` is set, checking it only between messages, so the current message always finishes. Every `housekeeping_every` seconds it runs the drain, **then** the sweeper: a job whose last transient attempt was dead-lettered is still `pending` until the drain fails it, and sweeping first would re-send it.
+- **Handlers** are `payload dict → result dict`, registered by type in `HANDLERS` and passed into the worker. `diagnostic.echo` returns `{message}`; `fail: "transient" | "permanent"` raises the matching error. A crashed worker's `running` job is run again on redelivery, so handlers must be idempotent.
 
 ## Auth flow
 
@@ -202,7 +238,7 @@ uv run ruff format .        # CI and /verify fail on unformatted code (--check)
 - **Known bugs** are `xfail(strict=True)` with the fixing sub-step in the reason. When fixed they XPASS and fail the run, so the marker has to come off.
 - **Format:** `ruff format` with its defaults (Black style, line length 88). CI and `/verify` run `ruff format --check`, so run `uv run ruff format .` before pushing. The one-time format pass is listed in [`.git-blame-ignore-revs`](../.git-blame-ignore-revs) so `git blame` skips it (GitHub does this automatically; locally: `git config blame.ignoreRevsFile .git-blame-ignore-revs`).
 - **Lint:** ruff's default rules plus `I` (import sorting). FastAPI `Depends` and friends are allowed in argument defaults. Migrations are linted too; `alembic/versions/` only ignores F401, since the template always imports `sqlmodel`, and `alembic` is marked third-party so the local `alembic/` folder doesn't confuse import sorting.
-- **Jobs:** [`test_job_queue_memory.py`](../backend/tests/test_job_queue_memory.py) (peek-lock, redelivery, max delivery → DLQ, renew, `LockLostError`, with `FakeClock` from `tests/helpers.py`), [`test_job_service.py`](../backend/tests/test_job_service.py) (commit-then-send, the sweeper's age and status filters), [`test_jobs_api.py`](../backend/tests/test_jobs_api.py) (202/422/401, owner-only 404, a failing send still 202). The queue is swapped with `app.dependency_overrides[get_job_queue]` (a `RecordingQueue` from `tests/helpers.py`, or a fresh `InMemoryJobQueue`).
+- **Jobs:** [`test_job_queue_memory.py`](../backend/tests/test_job_queue_memory.py) (peek-lock, redelivery, max delivery → DLQ, renew, `LockLostError`, with `FakeClock` from `tests/helpers.py`), [`test_job_service.py`](../backend/tests/test_job_service.py) (commit-then-send, the sweeper's age and status filters), [`test_jobs_api.py`](../backend/tests/test_jobs_api.py) (202/422/401, owner-only 404, a failing send still 202), [`test_worker.py`](../backend/tests/test_worker.py) (every `process_one` branch, redelivery, lock renewal and a lost lock with the fake clock, `run` stopping mid-handler and its drain-then-sweep pass, the drain), [`test_job_handlers.py`](../backend/tests/test_job_handlers.py). The queue is swapped with `app.dependency_overrides[get_job_queue]` (a `RecordingQueue` from `tests/helpers.py`, or a fresh `InMemoryJobQueue`).
 - **Seed:** [`test_seed.py`](../backend/tests/test_seed.py) seeds a small temp JSON set via `SEED_DATA_DIR` twice and checks the row counts don't change, and checks the default data dir is the repo's `shared/data/raw`.
 
 ## Migrations
